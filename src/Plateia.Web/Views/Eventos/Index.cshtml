@@ -1,0 +1,47 @@
+@model List<CartaoEvento>
+@{
+    ViewData["Title"] = "Eventos";
+    var admin = User.IsInRole(nameof(Perfil.Administrador));
+}
+<div class="cabeca">
+    <div>
+        <h1>@(admin ? "Eventos" : "Meus eventos")</h1>
+        <p>@(Model.Count == 0 ? "Nenhum evento ainda." : $"{Model.Count} evento(s) · {Model.Sum(e => e.Confirmados)} pessoas confirmadas")</p>
+    </div>
+    <a class="btn pri" href="/eventos/novo"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Novo evento</a>
+</div>
+
+<div class="eventos">
+    @{ var n = 0; }
+    @foreach (var e in Model)
+    {
+        var ocup = e.Capacidade == 0 ? 0 : Math.Min(1, (double)e.Confirmados / e.Capacidade);
+        <a class="bilhete cartao-evento" href="/eventos/@e.Id" style="--i:@(n++)">
+            <div class="cartaz" style="--cor:@e.Cor;--tinta:@Texto.TintaSobre(e.Cor);view-transition-name:ev-@e.Id">
+                <div class="topo-cartaz">
+                    <span>Nº @Texto.Numero(e.Id)</span>
+                    <span>@Hora.Data(e.InicioEm)</span>
+                </div>
+                <h2 class="display">@e.Titulo</h2>
+            </div>
+            <div class="picote"></div>
+            <div class="corpo">
+                <div class="linha-info">
+                    <span>@e.Local@(admin ? $" · {e.Organizador}" : "")</span>
+                    <span class="pilula @(e.Status switch { StatusEvento.Publicado => "ok", StatusEvento.Rascunho => "", StatusEvento.Cancelado => "perigo", _ => "info" })">@Texto.NomeStatus(e.Status)</span>
+                </div>
+                <div class="numeros">
+                    <div><b>@e.Confirmados<small class="suave" style="font-size:13px">/@e.Capacidade</small></b><span>confirmados</span></div>
+                    <div><b>@e.Pagos</b><span>pagos</span></div>
+                    <div><b>@e.Pendentes</b><span>a receber</span></div>
+                </div>
+                <div class="barra" role="img" aria-label="@((int)(ocup * 100))% dos lugares ocupados"><i style="--v:@Texto.N(ocup)"></i></div>
+            </div>
+        </a>
+    }
+    <a class="novo-evento" href="/eventos/novo">
+        <span class="mais">+</span>
+        <b>Criar evento</b>
+        <span style="font-size:14px">Palestra, workshop, encontro…</span>
+    </a>
+</div>

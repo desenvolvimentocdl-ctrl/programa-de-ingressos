@@ -1,0 +1,28 @@
+@model Evento
+@{
+    var aba = ViewData["Aba"] as string ?? "painel";
+    var link = $"{Context.Request.Scheme}://{Context.Request.Host}/e/{Model.Slug}";
+}
+<a class="voltar" href="/">← Eventos</a>
+<section class="cartaz cabeca-evento" style="--cor:@Model.Cor;--tinta:@Texto.TintaSobre(Model.Cor);view-transition-name:ev-@Model.Id">
+    <div>
+        <span class="mono" style="font-size:13px;font-weight:600">Nº @Texto.Numero(Model.Id) · @Texto.NomeStatus(Model.Status)@(Model.Status == StatusEvento.Publicado && !Model.InscricoesAbertas ? " · inscrições fechadas" : "")</span>
+        <h1 class="display" style="margin-top:10px">@Model.Titulo</h1>
+        <div class="meta">
+            <span>@Hora.DataLonga(Model.InicioEm)</span>
+            <span>@Model.Local</span>
+            @if (User.IsInRole(nameof(Perfil.Administrador)) && Model.Organizador is { } o) { <span>por @o.Nome</span> }
+        </div>
+    </div>
+    <div class="acoes">
+        <a class="btn" href="/e/@Model.Slug" target="_blank" rel="noopener">Ver página</a>
+        <button class="btn" type="button" data-copiar="@link" data-aviso="Link da página copiado. É só enviar para o público.">Copiar link</button>
+        <a class="btn" href="/eventos/@Model.Id/editar">Editar</a>
+        <a class="btn pri" href="/eventos/@Model.Id/checkin">Abrir check-in</a>
+    </div>
+</section>
+<nav class="abas" aria-label="Seções do evento">
+    <a href="/eventos/@Model.Id" class="@(aba == "painel" ? "on" : "")">Painel</a>
+    <a href="/eventos/@Model.Id/participantes" class="@(aba == "participantes" ? "on" : "")">Participantes</a>
+    <a href="/eventos/@Model.Id/checkin" class="@(aba == "checkin" ? "on" : "")">Check-in</a>
+</nav>

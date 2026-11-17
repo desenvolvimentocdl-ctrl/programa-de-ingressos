@@ -1,0 +1,69 @@
+@model Inscricao
+@{
+    Layout = "_LayoutPublico";
+    var e = Model.Evento!;
+    ViewData["Title"] = $"Ingresso · {e.Titulo}";
+    ViewData["Cor"] = e.Cor;
+    ViewData["LinkMarca"] = $"/e/{e.Slug}";
+    var novo = Context.Request.Query["novo"] == "1";
+    var link = (string)ViewBag.Link;
+    var tinta = Texto.TintaSobre(e.Cor);
+}
+@section TopoDireita {
+    <a class="btn fantasma peq" href="/e/@e.Slug">Página do evento</a>
+}
+<div class="pagina-ingresso">
+    @if (novo)
+    {
+        <div style="text-align:center;display:grid;gap:6px">
+            <b class="display" style="font-size:40px">Inscrição confirmada!</b>
+            <p class="suave">Guarde este ingresso: salve o link, tire um print ou adicione à agenda.</p>
+        </div>
+        <div class="fenda" aria-hidden="true"></div>
+    }
+
+    <article class="bilhete ingresso @(novo ? "imprimindo" : "") @(Model.Ativa ? "" : "cancelado")" aria-label="Ingresso de @Model.Nome para @e.Titulo">
+        <div class="cartaz" style="--cor:@e.Cor;--tinta:@tinta">
+            <div class="linha"><span>Nº @Texto.Numero(e.Id)</span><span>@(Model.TipoIngresso?.Nome)</span></div>
+            <h1 class="display">@e.Titulo</h1>
+            <div class="linha"><span>@Hora.Data(e.InicioEm)</span><span>@e.Local</span></div>
+        </div>
+        @if (!Model.Ativa)
+        {
+            <span class="estado" style="color:#C0303F">CANCELADO</span>
+        }
+        else if (Model.CheckinEm is not null)
+        {
+            <span class="estado" style="color:#11834F">UTILIZADO</span>
+        }
+        <div class="picote"></div>
+        <div class="miolo">
+            <div class="qr" role="img" aria-label="QR code do ingresso">@Html.Raw(Qr.Svg(link))</div>
+            <div class="codigo">@Model.Codigo</div>
+            <dl>
+                <div><dt>Participante</dt><dd>@Model.Nome</dd></div>
+                <div><dt>Pagamento</dt><dd><span class="pilula @Texto.ClassePagamento(Model.Pagamento)">@Texto.NomePagamento(Model.Pagamento)</span></dd></div>
+                <div><dt>Quando</dt><dd>@Hora.DataLonga(e.InicioEm)</dd></div>
+                <div><dt>Onde</dt><dd>@e.Local@(e.Endereco is { } end ? $" · {end}" : "")</dd></div>
+            </dl>
+        </div>
+    </article>
+
+    @if (Model.Ativa && Model.Pagamento == StatusPagamento.Pendente && Model.Valor > 0)
+    {
+        <div class="pagar">
+            <b>Falta pagar @Hora.Dinheiro(Model.Valor)</b>
+            <span>@(e.InstrucoesPagamento ?? "A organização vai entrar em contato com as instruções de pagamento.")</span>
+            <span style="opacity:.75">Informe o código <b class="mono">@Model.Codigo</b> ao enviar o comprovante.</span>
+        </div>
+    }
+
+    @if (Model.Ativa)
+    {
+        <div class="botoes-ingresso">
+            <a class="btn" href="/ingresso/@Model.Codigo/agenda.ics">Adicionar à agenda</a>
+            <button class="btn" type="button" onclick="window.print()">Salvar / imprimir</button>
+            <button class="btn" type="button" data-copiar="@link" data-aviso="Link do ingresso copiado." style="grid-column:1/-1">Copiar link do ingresso</button>
+        </div>
+    }
+</div>

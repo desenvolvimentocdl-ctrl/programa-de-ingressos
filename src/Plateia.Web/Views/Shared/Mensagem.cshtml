@@ -1,0 +1,21 @@
+@model string
+@{ Layout = null; }
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Plateia</title>
+    <partial name="_Fontes" />
+</head>
+<body>
+<div class="mensagem">
+    <div class="bilhete">
+        <h1>Ops.</h1>
+        <div class="picote" style="margin:0 -14px"></div>
+        <p>@Model</p>
+        <a class="btn" href="/">Voltar ao início</a>
+    </div>
+</div>
+</body>
+</html>

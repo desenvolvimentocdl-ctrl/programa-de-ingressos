@@ -1,0 +1,41 @@
+@model ResumoEvento
+@{
+    var e = Model.Evento;
+    ViewData["Title"] = "Check-in · " + e.Titulo;
+    ViewData["Aba"] = "checkin";
+    var recentes = (List<Inscricao>)ViewBag.Recentes;
+}
+<partial name="_CabecaEvento" model="e" />
+
+<div class="portaria">
+    <section class="leitor">
+        <div class="bloco" style="--i:0">
+            <h2>Leia o QR code ou digite o código</h2>
+            <form id="form-checkin" method="post" asp-antiforgery="true" action="/eventos/@e.Id/checkin" autocomplete="off">
+                <label class="sr" for="codigo">Código do ingresso</label>
+                <input id="codigo" name="codigo" placeholder="ABCD2345" maxlength="200" autofocus autocapitalize="characters" spellcheck="false" enterkeyhint="go">
+                <button class="btn pri grande">Conferir</button>
+            </form>
+            <p class="suave" style="font-size:13px">Leitores de QR USB funcionam direto neste campo. No celular, use a câmera:</p>
+            <button class="btn" type="button" id="btn-camera" hidden>Ler QR com a câmera</button>
+            <div class="camera"><video playsinline muted></video></div>
+        </div>
+        <div class="bilhete resultado" id="resultado" aria-live="polite">
+            <div class="topo-r"><span>Aguardando</span><span class="pilula aovivo acento">pronto</span></div>
+            <div class="corpo-r"><p class="suave">O resultado aparece aqui: liberado, já entrou, pagamento pendente ou código inválido.</p></div>
+        </div>
+    </section>
+    <section class="bloco" style="--i:1">
+        <h2>Na sala</h2>
+        <div class="contador-portaria grandao"><span id="presentes" data-contar="@Model.Presentes">@Model.Presentes</span><small>/ @Model.Confirmados</small></div>
+        <div class="barra"><i style="--v:@Texto.N(Model.Presentes / (double)Math.Max(1, Model.Confirmados));--c:var(--ok)"></i></div>
+        <h2 style="margin-top:8px">Últimas entradas</h2>
+        <ul class="feed" id="recentes">
+            @if (recentes.Count == 0) { <li class="vazio" style="display:block">Ninguém entrou ainda.</li> }
+            @foreach (var i in recentes)
+            {
+                <li><span class="ic Entrou" aria-hidden="true">✓</span><span>@i.Nome</span><time>@Hora.Hhmm(i.CheckinEm!.Value)</time></li>
+            }
+        </ul>
+    </section>
+</div>

@@ -1,0 +1,176 @@
+@model ListaParticipantes
+@{
+    var e = Model.Evento;
+    var r = Model.Resumo;
+    ViewData["Title"] = "Participantes · " + e.Titulo;
+    ViewData["Aba"] = "participantes";
+    var host = $"{Context.Request.Scheme}://{Context.Request.Host}";
+    var filtros = new[] { ("todos", "Todos", r.Confirmados), ("pagos", "Pagos", r.Pagos), ("pendentes", "Pendentes", r.Pendentes),
+        ("cortesia", "Cortesia", r.Cortesias), ("presentes", "Presentes", r.Presentes), ("cancelados", "Cancelados", r.Cancelados) };
+    string Url(string f) => $"/eventos/{e.Id}/participantes?filtro={f}" + (string.IsNullOrWhiteSpace(Model.Busca) ? "" : "&q=" + Uri.EscapeDataString(Model.Busca));
+    var tiposAtivos = e.Tipos.Where(t => t.Ativo).OrderBy(t => t.Ordem).ToList();
+    var n = 0;
+}
+<partial name="_CabecaEvento" model="e" />
+
+<div class="barra-filtros">
+    <nav class="filtros" aria-label="Filtrar participantes">
+        @foreach (var (chave, nome, total) in filtros)
+        {
+            <a href="@Url(chave)" class="@(Model.Filtro == chave ? "on" : "")" aria-current="@(Model.Filtro == chave ? "page" : null)">@nome <b>@total</b></a>
+        }
+    </nav>
+    <div class="acoes">
+        <form class="busca" method="get" role="search">
+            <input type="hidden" name="filtro" value="@Model.Filtro">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input type="search" name="q" value="@Model.Busca" placeholder="Nome, e-mail, telefone ou código" aria-label="Buscar participante">
+        </form>
+        <a class="btn" href="/eventos/@e.Id/exportar">Exportar planilha</a>
+        <button class="btn pri" type="button" data-abrir="#dlg-novo"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Adicionar</button>
+    </div>
+</div>
+
+@if (Model.Itens.Count == 0)
+{
+    <div class="bloco vazio" style="padding:48px">
+        @if (!string.IsNullOrWhiteSpace(Model.Busca)) { <text>Ninguém encontrado para "<b>@Model.Busca</b>".</text> }
+        else if (Model.Filtro == "todos") { <text>Nenhuma inscrição ainda. Divulgue o link da página ou adicione participantes manualmente.</text> }
+        else { <text>Ninguém nesta situação.</text> }
+    </div>
+}
+else
+{
+    <table class="tabela">
+        <thead>
+            <tr>
+                <th class="col-check"><input type="checkbox" id="sel-todos" aria-label="Selecionar todos"></th>
+                <th>Participante</th>
+                <th>Ingresso</th>
+                <th>Pagamento</th>
+                <th>Entrada</th>
+                <th class="col-acoes"><span class="sr">Ações</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var i in Model.Itens)
+            {
+                var url = $"/eventos/{e.Id}/participantes/{i.Id}";
+                var linkIngresso = $"{host}/ingresso/{i.Codigo}";
+                <tr class="@(i.Ativa ? "" : "cancelada")" style="--i:@(n++)">
+                    <td class="col-check">@if (i.Ativa) { <input type="checkbox" data-sel value="@i.Id" aria-label="Selecionar @i.Nome"> }</td>
+                    <td>
+                        <div class="pessoa">
+                            <span class="av">@Texto.Iniciais(i.Nome)</span>
+                            <div style="min-width:0"><b>@i.Nome</b><small>@i.Email@(i.Telefone is { } t ? $" · {t}" : "")</small></div>
+                        </div>
+                    </td>
+                    <td class="oculta-m"><span>@i.TipoIngresso?.Nome</span><br><small class="suave mono">@i.Codigo</small></td>
+                    <td>
+                        @if (i.Ativa)
+                        {
+                            <span class="pilula @Texto.ClassePagamento(i.Pagamento)">@Texto.NomePagamento(i.Pagamento)@(i.Pagamento == StatusPagamento.Pendente && i.Valor > 0 ? $" · {Hora.Dinheiro(i.Valor)}" : "")</span>
+                        }
+                        else
+                        {
+                            <span class="pilula perigo">Cancelada</span>
+                        }
+                    </td>
+                    <td>
+                        <div class="presenca">
+                            @if (!i.Ativa) { <span class="suave">—</span> }
+                            else if (i.CheckinEm is { } c)
+                            {
+                                <button type="button" class="carimbo" data-presenca="0" data-url="@url/presenca" title="Desfazer presença">PRESENTE<small>@Hora.Hhmm(c)</small></button>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn-entrar" data-presenca="1" data-url="@url/presenca">Marcar entrada</button>
+                            }
+                        </div>
+                    </td>
+                    <td class="col-acoes">
+                        <details class="menu">
+                            <summary class="btn fantasma ico" aria-label="Ações para @i.Nome">⋯</summary>
+                            <div class="menu-itens">
+                                @if (i.Ativa)
+                                {
+                                    @if (i.Pagamento != StatusPagamento.Pago)
+                                    {
+                                        <form method="post" asp-antiforgery="true" action="@url/pagamento"><input type="hidden" name="status" value="Pago"><input type="hidden" name="forma" value="PIX"><button>✓ Marcar como pago (PIX)</button></form>
+                                        <form method="post" asp-antiforgery="true" action="@url/pagamento"><input type="hidden" name="status" value="Pago"><input type="hidden" name="forma" value="Dinheiro"><button>✓ Marcar como pago (dinheiro)</button></form>
+                                    }
+                                    @if (i.Pagamento != StatusPagamento.Pendente)
+                                    {
+                                        <form method="post" asp-antiforgery="true" action="@url/pagamento"><input type="hidden" name="status" value="Pendente"><button>Voltar para pendente</button></form>
+                                    }
+                                    @if (i.Pagamento != StatusPagamento.Cortesia)
+                                    {
+                                        <form method="post" asp-antiforgery="true" action="@url/pagamento"><input type="hidden" name="status" value="Cortesia"><button>Dar cortesia</button></form>
+                                    }
+                                    <hr>
+                                    @if (i.Pagamento == StatusPagamento.Pendente && i.Telefone is { } fone)
+                                    {
+                                        var msg = $"Olá, {Texto.PrimeiroNome(i.Nome)}! Sua inscrição em \"{e.Titulo}\" está confirmada, falta só o pagamento de {Hora.Dinheiro(i.Valor)}.\n\n{e.InstrucoesPagamento}\n\nSeu ingresso: {linkIngresso}";
+                                        <a href="@Texto.LinkWhatsApp(fone, msg)" target="_blank" rel="noopener">Cobrar no WhatsApp</a>
+                                    }
+                                    else if (i.Telefone is { } fone2)
+                                    {
+                                        <a href="@Texto.LinkWhatsApp(fone2, $"Olá, {Texto.PrimeiroNome(i.Nome)}! Seu ingresso para \"{e.Titulo}\": {linkIngresso}")" target="_blank" rel="noopener">Enviar ingresso no WhatsApp</a>
+                                    }
+                                    <button type="button" data-copiar="@linkIngresso" data-aviso="Link do ingresso copiado.">Copiar link do ingresso</button>
+                                    <a href="@linkIngresso" target="_blank" rel="noopener">Ver ingresso</a>
+                                    <hr>
+                                    <form method="post" asp-antiforgery="true" action="@url/cancelar" data-confirmar="Cancelar a inscrição de @i.Nome? O lugar volta a ficar livre."><button class="perigo">Cancelar inscrição</button></form>
+                                }
+                                else
+                                {
+                                    <a href="@linkIngresso" target="_blank" rel="noopener">Ver ingresso</a>
+                                }
+                            </div>
+                        </details>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<div class="barra-lote" role="region" aria-label="Ações para os selecionados">
+    <b>0 selecionados</b>
+    <form method="post" asp-antiforgery="true" action="/eventos/@e.Id/participantes/lote" style="display:flex;gap:6px">
+        <button class="btn peq" name="acao" value="pago">Marcar pagos</button>
+        <button class="btn peq" name="acao" value="presente">Marcar presentes</button>
+        <button class="btn peq perigo" name="acao" value="cancelar" data-confirmar="Cancelar as inscrições selecionadas?">Cancelar</button>
+    </form>
+    <button class="btn peq ico" type="button" data-limpar aria-label="Limpar seleção" style="--c:transparent;--t:var(--bg)">×</button>
+</div>
+
+<dialog id="dlg-novo">
+    <form method="post" asp-antiforgery="true" action="/eventos/@e.Id/participantes">
+        <h2>Adicionar participante</h2>
+        <p class="suave" style="margin-top:-8px;font-size:14px">Para quem se inscreveu por telefone ou pessoalmente. O ingresso com QR code é gerado na hora.</p>
+        <label class="campo">Nome<input name="nome" required maxlength="160"></label>
+        <label class="campo">E-mail<input type="email" name="email" required maxlength="180"></label>
+        <label class="campo">WhatsApp <small>opcional</small><input name="telefone" inputmode="tel"></label>
+        <div class="grade-form">
+            <label class="campo s3">Ingresso
+                <select name="tipo" required>
+                    @foreach (var t in tiposAtivos) { <option value="@t.Id">@t.Nome · @Texto.Preco(t.Preco)</option> }
+                </select>
+            </label>
+            <label class="campo s3">Pagamento
+                <select name="pagamento">
+                    <option value="Pendente">Pendente</option>
+                    <option value="Pago">Já pagou</option>
+                    <option value="Cortesia">Cortesia</option>
+                </select>
+            </label>
+        </div>
+        <label class="campo">Observação <small>opcional, só a equipe vê</small><input name="observacao" maxlength="500"></label>
+        <div class="acoes" style="justify-content:end">
+            <button class="btn fantasma" type="button" data-fechar>Cancelar</button>
+            <button class="btn pri">Adicionar</button>
+        </div>
+    </form>
+</dialog>

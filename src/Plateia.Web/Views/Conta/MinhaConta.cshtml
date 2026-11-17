@@ -1,0 +1,18 @@
+@model Usuario
+@{ ViewData["Title"] = "Minha conta"; }
+<div class="cabeca"><div><h1>Minha conta</h1><p>@Model.Email</p></div></div>
+<div class="bento">
+    <form class="secao" method="post" asp-antiforgery="true" action="/minha-conta" style="grid-column:span 6">
+        <h2>Dados</h2>
+        <label class="campo">Nome<input name="nome" value="@Model.Nome" required maxlength="120"></label>
+        <label class="campo">Telefone / WhatsApp<input name="telefone" value="@Model.Telefone" inputmode="tel"></label>
+        <button class="btn pri" style="justify-self:start">Salvar</button>
+    </form>
+    <form class="secao" method="post" asp-antiforgery="true" action="/minha-conta/senha" style="grid-column:span 6">
+        <h2>Trocar senha</h2>
+        <label class="campo">Senha atual<input type="password" name="atual" autocomplete="current-password" required></label>
+        <label class="campo">Nova senha <small>mínimo 8 caracteres</small><input type="password" name="nova" autocomplete="new-password" minlength="8" required></label>
+        <label class="campo">Confirme a nova senha<input type="password" name="confirmacao" autocomplete="new-password" minlength="8" required></label>
+        <button class="btn pri" style="justify-self:start">Trocar senha</button>
+    </form>
+</div>

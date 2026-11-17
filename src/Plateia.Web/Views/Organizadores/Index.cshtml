@@ -1,0 +1,63 @@
+@model List<OrganizadorLinha>
+@{
+    ViewData["Title"] = "Organizadores";
+    var senha = (TempData["senha"] as string)?.Split('|');
+    var n = 0;
+}
+<div class="cabeca">
+    <div><h1>Organizadores</h1><p>Palestrantes e representantes que acessam o painel dos próprios eventos.</p></div>
+    <button class="btn pri" type="button" data-abrir="#dlg-org"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Novo acesso</button>
+</div>
+
+@if (senha is { Length: 2 })
+{
+    <div class="bilhete senha-nova">
+        <div><b>Senha temporária de @senha[0]</b><p class="suave" style="font-size:14px">Mostrada só agora. Envie para a pessoa e peça para trocar em "Minha conta".</p></div>
+        <code>@senha[1]</code>
+        <button class="btn" type="button" data-copiar="Acesso ao Plateia: @($"{Context.Request.Scheme}://{Context.Request.Host}/entrar") · e-mail: @senha[0] · senha: @senha[1]" data-aviso="Dados de acesso copiados.">Copiar mensagem</button>
+    </div>
+}
+
+<table class="tabela">
+    <thead><tr><th>Pessoa</th><th>Perfil</th><th>Eventos</th><th>Situação</th><th class="col-acoes"><span class="sr">Ações</span></th></tr></thead>
+    <tbody>
+        @foreach (var u in Model)
+        {
+            <tr class="@(u.Ativo ? "" : "cancelada")" style="--i:@(n++)">
+                <td><div class="pessoa"><span class="av">@Texto.Iniciais(u.Nome)</span><div><b>@u.Nome</b><small>@u.Email@(u.Telefone is { } t ? $" · {t}" : "")</small></div></div></td>
+                <td class="oculta-m">@Texto.NomePerfil(u.Perfil)</td>
+                <td class="oculta-m mono">@u.Eventos</td>
+                <td><span class="pilula @(u.Ativo ? "ok" : "")">@(u.Ativo ? "Ativo" : "Desativado")</span></td>
+                <td class="col-acoes">
+                    <details class="menu">
+                        <summary class="btn fantasma ico" aria-label="Ações para @u.Nome">⋯</summary>
+                        <div class="menu-itens">
+                            <form method="post" asp-antiforgery="true" action="/organizadores/@u.Id/senha" data-confirmar="Gerar uma nova senha para @u.Nome? A senha atual deixa de funcionar."><button>Gerar nova senha</button></form>
+                            <form method="post" asp-antiforgery="true" action="/organizadores/@u.Id/ativo"><input type="hidden" name="ativo" value="@(u.Ativo ? "false" : "true")"><button class="@(u.Ativo ? "perigo" : "")">@(u.Ativo ? "Desativar acesso" : "Reativar acesso")</button></form>
+                        </div>
+                    </details>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<dialog id="dlg-org">
+    <form method="post" asp-antiforgery="true" action="/organizadores">
+        <h2>Novo acesso</h2>
+        <p class="suave" style="margin-top:-8px;font-size:14px">Uma senha temporária é gerada e mostrada na próxima tela.</p>
+        <label class="campo">Nome<input name="nome" required maxlength="120"></label>
+        <label class="campo">E-mail<input type="email" name="email" required maxlength="180"></label>
+        <label class="campo">WhatsApp <small>opcional</small><input name="telefone" inputmode="tel"></label>
+        <label class="campo">Perfil
+            <select name="perfil">
+                <option value="Organizador">Organizador: vê só os próprios eventos</option>
+                <option value="Administrador">Administrador: vê tudo e cadastra acessos</option>
+            </select>
+        </label>
+        <div class="acoes" style="justify-content:end">
+            <button class="btn fantasma" type="button" data-fechar>Cancelar</button>
+            <button class="btn pri">Criar acesso</button>
+        </div>
+    </form>
+</dialog>

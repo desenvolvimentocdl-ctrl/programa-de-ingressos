@@ -1,0 +1,109 @@
+@model Evento
+@{
+    var novo = Model.Id == 0;
+    ViewData["Title"] = novo ? "Novo evento" : "Editar evento";
+    var organizadores = ViewBag.Organizadores as List<OpcaoOrganizador>;
+    var corPreset = Texto.Cores.Contains(Model.Cor, StringComparer.OrdinalIgnoreCase);
+}
+<a class="voltar" href="@(novo ? "/" : $"/eventos/{Model.Id}")">← Voltar</a>
+<div class="cabeca"><div><h1>@(novo ? "Novo evento" : "Editar evento")</h1><p>@(novo ? "Comece pelo básico: dá para mudar tudo depois." : Model.Titulo)</p></div></div>
+
+<form id="form-evento" method="post" asp-antiforgery="true" action="@(novo ? "/eventos/novo" : $"/eventos/{Model.Id}/editar")" class="form-evento">
+    <div class="col">
+        <section class="secao">
+            <h2>O evento</h2>
+            <div class="grade-form">
+                <label class="campo">Nome do evento<input name="titulo" value="@Model.Titulo" required maxlength="160" placeholder="Ex.: Como vender mais pelo Instagram" autofocus="@(novo ? "autofocus" : null)"></label>
+                <label class="campo">Chamada <small>uma frase curta abaixo do nome</small><input name="subtitulo" value="@Model.Subtitulo" maxlength="200" placeholder="Palestra + bate-papo"></label>
+                <label class="campo">Descrição <small>aparece na página pública</small><textarea name="descricao" maxlength="8000" rows="6" placeholder="O que a pessoa vai aprender, para quem é, o que levar…">@Model.Descricao</textarea></label>
+                <label class="campo s3">Início<input type="datetime-local" name="inicio" value="@Hora.Input(Model.InicioEm)" required></label>
+                <label class="campo s3">Término <small>opcional</small><input type="datetime-local" name="fim" value="@Hora.Input(Model.FimEm)"></label>
+                <label class="campo s3">Local<input name="local" value="@Model.Local" required maxlength="160" placeholder="Auditório"></label>
+                <label class="campo s3">Endereço <small>opcional</small><input name="endereco" value="@Model.Endereco" maxlength="250"></label>
+                <label class="campo s2">Capacidade <small>lugares</small><input type="number" name="capacidade" value="@Model.Capacidade" min="1" max="100000" required inputmode="numeric"></label>
+                @if (organizadores is not null)
+                {
+                    <label class="campo s4">Organizador(a)
+                        <select name="organizador">
+                            @foreach (var o in organizadores)
+                            {
+                                <option value="@o.Id" selected="@(o.Id == Model.OrganizadorId || (novo && o.Nome == User.Identity?.Name) ? "selected" : null)">@o.Nome</option>
+                            }
+                        </select>
+                    </label>
+                }
+            </div>
+        </section>
+
+        <section class="secao">
+            <h2>Ingressos</h2>
+            <p>Preço zero = gratuito (entra como cortesia). Deixe a quantidade em branco para usar só a capacidade do evento.</p>
+            <div id="tipos" style="display:grid;gap:10px">
+                @foreach (var t in Model.Tipos)
+                {
+                    <div class="bilhete tipo-linha">
+                        <input type="hidden" name="tipo_id" value="@(t.Id == 0 ? "" : t.Id)">
+                        <input type="hidden" name="tipo_remover" value="0">
+                        <label class="campo nome">Nome<input name="tipo_nome" value="@t.Nome" maxlength="100" required></label>
+                        <label class="campo">Preço (R$)<input name="tipo_preco" value="@t.Preco.ToString("0.##", Hora.PtBr)" inputmode="decimal" placeholder="0"></label>
+                        <label class="campo">Quantidade<input type="number" name="tipo_qtd" value="@t.Quantidade" min="1" inputmode="numeric" placeholder="—"></label>
+                        <button type="button" class="btn fantasma ico" data-remover-tipo title="Remover" aria-label="Remover tipo de ingresso" style="margin-bottom:4px">×</button>
+                        <label class="campo desc">Detalhe <small>opcional</small><input name="tipo_desc" value="@t.Descricao" maxlength="300" placeholder="Ex.: válido para estudantes com carteirinha"></label>
+                    </div>
+                }
+            </div>
+            <button type="button" class="btn" id="add-tipo" style="justify-self:start"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Outro tipo de ingresso</button>
+            <label class="campo">Como pagar <small>aparece no ingresso enquanto o pagamento está pendente (chave PIX, conta, contato para comprovante)</small>
+                <textarea name="instrucoes" rows="3" maxlength="2000" placeholder="PIX: seuemail@exemplo.com · envie o comprovante para (34) 9…">@Model.InstrucoesPagamento</textarea>
+            </label>
+        </section>
+    </div>
+
+    <aside>
+        <div class="bilhete previa">
+            <div class="cartaz" style="--cor:@Model.Cor;--tinta:@Texto.TintaSobre(Model.Cor)">
+                <span class="mono" style="font-size:13px;font-weight:600">PRÉVIA</span>
+                <h2 class="display" id="previa-titulo">@(string.IsNullOrEmpty(Model.Titulo) ? "Nome do evento" : Model.Titulo)</h2>
+            </div>
+            <div class="picote"></div>
+            <div class="corpo"><b style="color:var(--texto)" id="previa-local">@(string.IsNullOrEmpty(Model.Local) ? "Local" : Model.Local)</b><span>Ingresso com QR code</span></div>
+        </div>
+
+        <section class="secao">
+            <div class="campo">Cor do evento
+                <div class="cores">
+                    @foreach (var c in Texto.Cores)
+                    {
+                        <label title="@c"><input type="radio" name="cor-opcao" value="@c" checked="@(string.Equals(c, Model.Cor, StringComparison.OrdinalIgnoreCase) ? "checked" : null)"><span style="--c:@c"></span></label>
+                    }
+                    <label title="Outra cor"><span class="sr">Outra cor</span><input type="color" id="cor-livre" value="@(corPreset ? "#888888" : Model.Cor)"></label>
+                </div>
+                <input type="hidden" name="cor" id="cor-final" value="@Model.Cor">
+            </div>
+            <div class="campo">Situação
+                <div class="status-opcoes">
+                    @foreach (var (s, d) in new[] { (StatusEvento.Rascunho, "Só você vê"), (StatusEvento.Publicado, "Aberto ao público"), (StatusEvento.Encerrado, "Já aconteceu"), (StatusEvento.Cancelado, "Não vai acontecer") })
+                    {
+                        <label><input type="radio" name="status" value="@s" checked="@(Model.Status == s ? "checked" : null)">@Texto.NomeStatus(s)<small>@d</small></label>
+                    }
+                </div>
+            </div>
+            <label class="chave"><span><b>Aceitar inscrições</b><small>Desligue para fechar sem despublicar</small></span>
+                <input type="checkbox" name="inscricoes_abertas" value="true" checked="@(Model.InscricoesAbertas ? "checked" : null)">
+            </label>
+            <button class="btn pri grande">@(novo ? "Criar evento" : "Salvar alterações")</button>
+        </section>
+    </aside>
+</form>
+
+<template id="modelo-tipo">
+    <div class="bilhete tipo-linha">
+        <input type="hidden" name="tipo_id" value="">
+        <input type="hidden" name="tipo_remover" value="0">
+        <label class="campo nome">Nome<input name="tipo_nome" maxlength="100" required placeholder="Ex.: Meia-entrada"></label>
+        <label class="campo">Preço (R$)<input name="tipo_preco" inputmode="decimal" placeholder="0"></label>
+        <label class="campo">Quantidade<input type="number" name="tipo_qtd" min="1" inputmode="numeric" placeholder="—"></label>
+        <button type="button" class="btn fantasma ico" data-remover-tipo title="Remover" aria-label="Remover tipo de ingresso" style="margin-bottom:4px">×</button>
+        <label class="campo desc">Detalhe <small>opcional</small><input name="tipo_desc" maxlength="300"></label>
+    </div>
+</template>

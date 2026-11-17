@@ -1,0 +1,30 @@
+@{
+    var cor = ViewData["Cor"] as string ?? "#FF6B4A";
+    var tinta = Texto.TintaSobre(cor);
+}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="@cor">
+    <title>@ViewData["Title"]</title>
+    @if (ViewData["Descricao"] is string d)
+    {
+        <meta name="description" content="@d">
+        <meta property="og:title" content="@ViewData["Title"]">
+        <meta property="og:description" content="@d">
+    }
+    <partial name="_Fontes" />
+</head>
+<body class="publico" style="--cor:@cor;--tinta:@tinta">
+@RenderSection("Topo", required: false)
+<header class="topo-publico">
+    <a class="marca" href="@(ViewData["LinkMarca"] as string ?? "#")" aria-label="Plateia"><partial name="_Marca" /></a>
+    @RenderSection("TopoDireita", required: false)
+</header>
+@RenderBody()
+<footer class="rodape-publico">Ingressos por <b>Plateia</b></footer>
+<script src="~/js/plateia.js" asp-append-version="true" defer></script>
+</body>
+</html>

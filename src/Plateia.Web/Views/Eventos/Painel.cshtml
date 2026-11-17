@@ -1,0 +1,127 @@
+@model ResumoEvento
+@{
+    var e = Model.Evento;
+    ViewData["Title"] = e.Titulo;
+    ViewData["Aba"] = "painel";
+
+    // Grade de assentos: um quadradinho por lugar (ou por grupo de pessoas, em eventos grandes).
+    var porAssento = (int)Math.Ceiling(Math.Max(e.Capacidade, Model.Confirmados) / 480.0);
+    var ativos = Model.Linhas.Where(l => l.Status == StatusInscricao.Confirmada)
+        .OrderBy(l => l.Pagamento switch { StatusPagamento.Pago => 0, StatusPagamento.Cortesia => 1, _ => 2 })
+        .ThenBy(l => l.CheckinEm is null)
+        .Select(l => (l.Pagamento switch { StatusPagamento.Pago => "pago", StatusPagamento.Cortesia => "cortesia", _ => "pendente" }) + (l.CheckinEm is null ? "" : " presente"))
+        .Concat(Enumerable.Repeat("", Model.Livres)).ToList();
+    var assentos = Enumerable.Range(0, (int)Math.Ceiling(ativos.Count / (double)porAssento)).Select(j => ativos[j * porAssento]).ToList();
+    // Colunas proporcionais ao total, para a grade lembrar uma plateia (mais larga que funda).
+    var colunas = Math.Clamp((int)Math.Ceiling(Math.Sqrt(assentos.Count * 2.6)), 8, 40);
+
+    var conf = Math.Max(1, Model.Confirmados);
+    var dias = Model.PorDia(14, Hora.Local, Hora.HojeLocal);
+    var maxDia = Math.Max(1, dias.Max(d => d.Total));
+    var semInscricao = Model.Linhas.Count == 0;
+}
+<partial name="_CabecaEvento" model="e" />
+
+<div class="bento">
+    <section class="bloco b-plateia" style="--i:0">
+        <h2>Plateia @if (e.Status == StatusEvento.Publicado && e.InscricoesAbertas) { <span class="pilula ok aovivo">Inscrições abertas</span> }</h2>
+        <div class="lotacao">
+            <div class="grandao"><span data-contar="@Model.Confirmados">@Model.Confirmados</span><small> / @e.Capacidade lugares</small></div>
+            <div class="suave" style="text-align:right">
+                <b class="mono" style="color:var(--texto);font-size:20px">@((int)Math.Round(Model.Ocupacao * 100))%</b> ocupado<br>
+                <span>@Model.Livres livre(s)</span>
+            </div>
+        </div>
+        <div class="palco">
+            <div class="assentos" style="--cols:@colunas" role="img" aria-label="@Model.Confirmados de @e.Capacidade lugares ocupados: @Model.Pagos pagos, @Model.Pendentes pendentes, @Model.Cortesias cortesias, @Model.Presentes presentes">
+                @for (var i = 0; i < assentos.Count; i++)
+                {
+                    <i class="@assentos[i]" style="--i:@i"></i>
+                }
+            </div>
+        </div>
+        <div class="legenda">
+            <span><i class="pago"></i>Pago</span>
+            <span><i class="pendente"></i>Pendente</span>
+            <span><i class="cortesia"></i>Cortesia</span>
+            <span><i class="presente"></i>Presente</span>
+            <span><i></i>Livre</span>
+            @if (porAssento > 1) { <span>· cada quadrado = @porAssento lugares</span> }
+        </div>
+        @if (semInscricao)
+        {
+            <div class="alerta-caixa" style="color:var(--texto);background:var(--sup-2)">
+                @if (e.Status == StatusEvento.Rascunho)
+                {
+                    <text>O evento está em <b>rascunho</b>: só você vê a página. Quando estiver pronto, <a href="/eventos/@e.Id/editar">publique</a> e envie o link.</text>
+                }
+                else
+                {
+                    <text>Ninguém se inscreveu ainda. <a href="#" data-copiar="@($"{Context.Request.Scheme}://{Context.Request.Host}/e/{e.Slug}")" data-aviso="Link copiado.">Copie o link da página</a> e divulgue.</text>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="bloco b-pagto" style="--i:1">
+        <h2>Pagamentos <a class="btn fantasma peq" href="/eventos/@e.Id/participantes?filtro=pendentes">Pendentes →</a></h2>
+        <div class="anel-linha">
+            <div class="anel-num">
+                <div class="anel" style="--a:@Texto.N(Model.Pagos / (double)conf);--b:@Texto.N(Model.Pendentes / (double)conf);--c:@Texto.N(Model.Cortesias / (double)conf)"></div>
+                <div><b data-contar="@Model.Pagos">@Model.Pagos</b><span>pagos</span></div>
+            </div>
+            <div class="lista-valores">
+                <div><span class="pilula ok">Pagos</span><b>@Model.Pagos</b></div>
+                <div><span class="pilula alerta">Pendentes</span><b>@Model.Pendentes</b></div>
+                <div><span class="pilula info">Cortesia</span><b>@Model.Cortesias</b></div>
+            </div>
+        </div>
+        <div class="dinheiro">
+            <div><b data-contar="@Texto.N((double)Model.Arrecadado)" data-formato="dinheiro">@Hora.Dinheiro(Model.Arrecadado)</b><span>recebido</span></div>
+            <div><b data-contar="@Texto.N((double)Model.AReceber)" data-formato="dinheiro" style="color:var(--alerta)">@Hora.Dinheiro(Model.AReceber)</b><span>a receber</span></div>
+        </div>
+    </section>
+
+    <section class="bloco b-checkin" style="--i:2">
+        <h2>Check-in <a class="btn fantasma peq" href="/eventos/@e.Id/checkin">Abrir →</a></h2>
+        <div class="grandao"><span data-contar="@Model.Presentes">@Model.Presentes</span><small> / @Model.Confirmados presentes</small></div>
+        <div class="barra"><i style="--v:@Texto.N(Model.Presentes / (double)conf);--c:var(--ok)"></i></div>
+        <p class="suave" style="font-size:14px">
+            @if (Hora.Local(e.InicioEm).Date == Hora.HojeLocal) { <text>É hoje! Abra o check-in no celular para ler os QR codes na entrada.</text> }
+            else if (e.InicioEm > DateTime.UtcNow) { var faltam = (Hora.Local(e.InicioEm).Date - Hora.HojeLocal).Days; <text>Faltam <b class="mono">@faltam</b> dia(s). No dia, a entrada é pelo QR code do ingresso.</text> }
+            else { <text>@(Model.Confirmados - Model.Presentes) inscrito(s) não compareceram.</text> }
+        </p>
+    </section>
+
+    <section class="bloco b-tipos" style="--i:3">
+        <h2>Por tipo de ingresso</h2>
+        <div class="tipos">
+            @foreach (var t in Model.PorTipo)
+            {
+                var lim = t.Quantidade ?? e.Capacidade;
+                <div class="t">
+                    <div><span><b>@t.Nome</b> <span class="suave">· @Texto.Preco(t.Preco)</span>@(t.Ativo ? "" : " (desativado)")</span><span class="mono">@t.Vendidos<span class="suave">/@lim</span></span></div>
+                    <div class="barra"><i style="--v:@Texto.N(Math.Min(1, t.Vendidos / (double)Math.Max(1, lim)))"></i></div>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="bloco b-dias" style="--i:4">
+        <h2>Inscrições · 14 dias</h2>
+        <div class="colunas" role="img" aria-label="Inscrições por dia nos últimos 14 dias">
+            @for (var i = 0; i < dias.Count; i++)
+            {
+                <i class="@(dias[i].Total > 0 ? "cheia" : "")" style="--v:@Texto.N(dias[i].Total / (double)maxDia);--i:@i" title="@dias[i].Dia.ToString("dd/MM"): @dias[i].Total"></i>
+            }
+        </div>
+        <div class="eixo"><span>@dias[0].Dia.ToString("dd/MM")</span><span>hoje</span></div>
+    </section>
+
+    <section class="bloco b-feed" style="--i:5">
+        <h2>Ao vivo <span class="pilula acento aovivo">agora</span></h2>
+        <div data-aovivo="/eventos/@e.Id/ao-vivo">
+            <partial name="_AoVivo" model="Model.Recentes(8)" />
+        </div>
+    </section>
+</div>

@@ -1,0 +1,15 @@
+@model List<Acontecimento>
+<ul class="feed">
+    @if (Model.Count == 0)
+    {
+        <li class="vazio" style="display:block">Quando alguém se inscrever, aparece aqui.</li>
+    }
+    @foreach (var a in Model)
+    {
+        <li data-chave="@a.Tipo-@a.Quando.Ticks-@a.Nome.GetHashCode()">
+            <span class="ic @a.Tipo" aria-hidden="true">@(a.Tipo switch { TipoAcontecimento.Pagou => "$", TipoAcontecimento.Entrou => "✓", TipoAcontecimento.Cancelou => "×", _ => "+" })</span>
+            <span><b>@Texto.PrimeiroNome(a.Nome)</b> @(a.Tipo switch { TipoAcontecimento.Pagou => "pagou", TipoAcontecimento.Entrou => "entrou", TipoAcontecimento.Cancelou => "cancelou", _ => "se inscreveu" })</span>
+            <time datetime="@a.Quando.ToString("o")">@Hora.Relativa(a.Quando)</time>
+        </li>
+    }
+</ul>

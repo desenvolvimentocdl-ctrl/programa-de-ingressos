@@ -1,0 +1,45 @@
+@{
+    var rota = Context.Request.Path.Value ?? "/";
+    var admin = User.IsInRole(nameof(Perfil.Administrador));
+    var csrf = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf" content="@csrf">
+    <meta name="theme-color" content="#0E0D0C">
+    <title>@(ViewData["Title"] is string t ? t + " · " : "")Plateia</title>
+    <partial name="_Fontes" />
+</head>
+<body>
+<header class="topo">
+    <a class="marca" href="/" aria-label="Plateia, início"><partial name="_Marca" /></a>
+    <nav aria-label="Menu principal">
+        <a href="/" class="@(rota == "/" || rota.StartsWith("/eventos") ? "on" : "")">Eventos</a>
+        @if (admin)
+        {
+            <a href="/organizadores" class="@(rota.StartsWith("/organizadores") ? "on" : "")">Organizadores</a>
+        }
+    </nav>
+    <div class="eu">
+        <a href="/minha-conta" title="Minha conta">
+            <span class="eu-txt" style="text-align:right"><b>@User.Identity?.Name</b><small>@(admin ? "Administrador" : "Organizador")</small></span>
+            <span class="av">@Texto.Iniciais(User.Identity?.Name)</span>
+        </a>
+        <form method="post" asp-antiforgery="true" action="/sair"><button class="btn fantasma ico" title="Sair" aria-label="Sair"><svg viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg></button></form>
+    </div>
+</header>
+
+@if (TempData["msg"] is string msg) { <div class="toast" role="status">@msg</div> }
+@if (TempData["erro"] is string erro) { <div class="toast erro" role="alert">@erro</div> }
+
+<main class="pagina">
+    @RenderBody()
+</main>
+
+<script src="~/js/plateia.js" asp-append-version="true" defer></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

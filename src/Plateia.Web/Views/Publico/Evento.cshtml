@@ -1,0 +1,91 @@
+@model PaginaEvento
+@{
+    Layout = "_LayoutPublico";
+    var e = Model.Evento;
+    ViewData["Title"] = e.Titulo;
+    ViewData["Cor"] = e.Cor;
+    ViewData["Descricao"] = e.Subtitulo ?? $"{Hora.DataLonga(e.InicioEm)} · {e.Local}";
+    var local = Hora.Local(e.InicioEm);
+    var form = ViewBag.Form as dynamic;
+    int? tipoEscolhido = form?.tipo;
+    var disponiveis = Model.Tipos.Where(t => t.Quantidade is null || t.Vendidos < t.Quantidade).ToList();
+    tipoEscolhido ??= disponiveis.FirstOrDefault()?.Id;
+    var poucas = Model.Livres <= Math.Max(5, e.Capacidade * 0.2);
+}
+@section Topo {
+    @if (Model.Previa) { <div class="aviso-previa">Prévia: este evento está em rascunho e só você consegue ver esta página.</div> }
+}
+
+<section class="cartaz hero-evento" style="--cor:@e.Cor;--tinta:@Texto.TintaSobre(e.Cor)">
+    <div class="chips">
+        <span>@Hora.Data(e.InicioEm)</span>
+        <span>@e.Local</span>
+        @if (e.Status == StatusEvento.Cancelado) { <span>Cancelado</span> }
+    </div>
+    <h1 class="display">@e.Titulo</h1>
+    @if (e.Subtitulo is { } s) { <p class="sub">@s</p> }
+</section>
+
+<div class="conteudo-evento">
+    <div class="sobre">
+        <div class="fatos">
+            <div class="fato">
+                <div class="dia"><small>@local.ToString("MMM", Hora.PtBr).TrimEnd('.')</small><b>@local.Day</b></div>
+                <div><strong>@local.ToString("dddd", Hora.PtBr)</strong><p>@local.ToString("HH:mm")@(e.FimEm is { } f ? " às " + Hora.Local(f).ToString("HH:mm") : "")</p></div>
+            </div>
+            <div class="fato">
+                <div class="dia" style="display:grid;place-items:center;font-size:22px" aria-hidden="true">⌖</div>
+                <div><strong>@e.Local</strong><p>@(e.Endereco ?? "Endereço no ingresso")</p></div>
+            </div>
+        </div>
+        @if (e.Descricao is { } d)
+        {
+            <div>
+                <h2>Sobre</h2>
+                <p class="texto" style="margin-top:14px">@d</p>
+            </div>
+        }
+        @if (e.Organizador is { } o)
+        {
+            <div class="organiza"><span class="av" style="background:var(--sup-3);color:var(--texto)">@Texto.Iniciais(o.Nome)</span><div><span>Organização</span><b>@o.Nome</b></div></div>
+        }
+    </div>
+
+    <aside class="compra" id="inscricao">
+        <div class="bilhete">
+            <div class="topo-compra"><b>Garanta seu lugar</b><span class="mono" style="font-size:13px">Nº @Texto.Numero(e.Id)</span></div>
+            <div class="picote" style="margin:0 18px"></div>
+            @if (Model.AceitaInscricoes && disponiveis.Count > 0)
+            {
+                <form method="post" asp-antiforgery="true" action="/e/@e.Slug#inscricao">
+                    @if (ViewBag.Erro is string erro) { <div class="alerta-caixa erro" role="alert">@erro</div> }
+                    @if (poucas) { <span class="restam">🔥 Restam @Model.Livres lugar(es)</span> }
+                    <fieldset class="opcoes" style="border:0;padding:0;margin:0">
+                        <legend class="sr">Tipo de ingresso</legend>
+                        @foreach (var t in Model.Tipos)
+                        {
+                            var esgotado = t.Quantidade is { } q && t.Vendidos >= q;
+                            <label class="opcao @(esgotado ? "esgotado" : "")">
+                                <input type="radio" name="tipo" value="@t.Id" required checked="@(t.Id == tipoEscolhido && !esgotado ? "checked" : null)" disabled="@(esgotado ? "disabled" : null)">
+                                <span><b>@t.Nome</b>@if (esgotado) { <small>Esgotado</small> } else if (e.Tipos.First(x => x.Id == t.Id).Descricao is { } td) { <small>@td</small> }</span>
+                                <span class="preco">@Texto.Preco(t.Preco)</span>
+                            </label>
+                        }
+                    </fieldset>
+                    <label class="campo">Nome completo<input name="nome" value="@form?.nome" required maxlength="160" autocomplete="name"></label>
+                    <label class="campo">E-mail<input type="email" name="email" value="@form?.email" required maxlength="180" autocomplete="email"></label>
+                    <label class="campo">WhatsApp <small>para avisos do evento</small><input name="telefone" value="@form?.telefone" inputmode="tel" autocomplete="tel" placeholder="(34) 9 0000-0000"></label>
+                    <button class="btn pri grande">Confirmar inscrição</button>
+                    <p class="suave" style="font-size:12px;text-align:center">Você recebe o ingresso com QR code na hora. Se houver valor, as instruções de pagamento aparecem nele.</p>
+                </form>
+            }
+            else
+            {
+                <div class="fechado">
+                    <b>@(e.Status switch { StatusEvento.Encerrado => "Evento encerrado", StatusEvento.Cancelado => "Evento cancelado", _ => Model.Livres <= 0 || disponiveis.Count == 0 ? "Lotado" : "Inscrições fechadas" })</b>
+                    <p class="suave">@(e.Status == StatusEvento.Encerrado ? "Obrigado a quem participou!" : "Fale com a organização para saber se abrirão novas vagas.")</p>
+                </div>
+            }
+        </div>
+    </aside>
+</div>

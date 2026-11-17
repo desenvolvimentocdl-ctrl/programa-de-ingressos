@@ -1,0 +1,43 @@
+@model string?
+@{
+    Layout = null;
+    // Arte da tela de entrada: uma plateia enchendo (assentos "ocupados" sorteados de forma fixa).
+    var rnd = new Random(7);
+}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Entrar · Plateia</title>
+    <partial name="_Fontes" />
+</head>
+<body>
+<div class="login">
+    <section class="login-arte cartaz" aria-hidden="true">
+        <span class="marca"><partial name="_Marca" /></span>
+        <div style="display:grid;gap:36px">
+            <h2 class="display">Casa cheia<br>começa aqui.</h2>
+            <div class="assentos">
+                @for (var i = 0; i < 168; i++)
+                {
+                    <i class="@(rnd.Next(10) < 6 ? "pago" : "")" style="--i:@i"></i>
+                }
+            </div>
+        </div>
+        <p style="max-width:44ch;font-weight:500">Inscrições, pagamentos e check-in dos seus eventos, em tempo real.</p>
+    </section>
+    <section class="login-form">
+        <form method="post" asp-antiforgery="true" action="/entrar">
+            <h1>Entrar</h1>
+            <p class="suave" style="margin-top:-8px">Use o e-mail e a senha que você recebeu da organização.</p>
+            @if (ViewBag.Erro is string erro) { <div class="alerta-caixa erro" role="alert">@erro</div> }
+            <label class="campo">E-mail<input type="email" name="email" value="@ViewBag.Email" autocomplete="username" required autofocus></label>
+            <label class="campo">Senha<input type="password" name="senha" autocomplete="current-password" required></label>
+            <input type="hidden" name="returnUrl" value="@Model">
+            <button class="btn pri grande">Entrar</button>
+        </form>
+    </section>
+</div>
+</body>
+</html>
