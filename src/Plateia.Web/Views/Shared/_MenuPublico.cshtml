@@ -1,0 +1,118 @@
+@*
+    Menu da vitrine: Explorar (atalhos e categorias), busca, Criar evento, Meus eventos e conta.
+    No celular vira uma gaveta. Funciona sem JavaScript (<details>); o script só fecha ao clicar fora/Esc.
+*@
+@{
+    var logado = User.Identity?.IsAuthenticated == true;
+    var admin = User.IsInRole(nameof(Perfil.Administrador));
+    var nome = User.Identity?.Name ?? "";
+    var q = Context.Request.Query;
+    var caminho = Context.Request.Path.Value ?? "/";
+    var meusEventos = logado ? "/painel" : "/entrar?returnUrl=%2Fpainel";
+    var criarEvento = logado ? "/eventos/novo" : "/criar-conta";
+    var atalhos = new[] { ("hoje", "Hoje"), ("amanha", "Amanhã"), ("fim-de-semana", "Neste fim de semana"), ("semana", "Próximos 7 dias"), ("mes", "Próximos 30 dias") };
+    var categorias = Enum.GetValues<CategoriaEvento>();
+    bool Ativo(string chave, string valor) => caminho == "/eventos" && q[chave] == valor;
+    var tudoAtivo = caminho == "/eventos" && q.Count == 0;
+}
+<header class="topo-publico">
+    <a class="marca" href="/" aria-label="Plateia, página inicial"><partial name="_Marca" /></a>
+
+    <details class="drop explorar">
+        <summary>Explorar <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="drop-painel mega">
+            <div class="mega-col">
+                <b>Quando</b>
+                @foreach (var (k, n) in atalhos) { <a href="/eventos?quando=@k">@n</a> }
+            </div>
+            <div class="mega-col">
+                <b>Do seu jeito</b>
+                <a href="/eventos">Todos os eventos</a>
+                <a href="/eventos?online=1">Online, de qualquer lugar</a>
+                <a href="/eventos?gratis=1">Gratuitos</a>
+            </div>
+            <div class="mega-col mega-cats">
+                <b>Categorias</b>
+                <div>@foreach (var c in categorias) { <a href="/eventos?categoria=@Texto.SlugCategoria(c)">@Texto.NomeCategoria(c)</a> }</div>
+            </div>
+        </div>
+    </details>
+
+    <form class="busca-topo" action="/eventos" method="get" role="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" name="q" value="@q["q"]" placeholder="Buscar eventos, produtores, cidades" aria-label="Buscar eventos">
+    </form>
+
+    <nav class="nav-publico" aria-label="Menu principal">
+        <a href="@criarEvento" class="nav-item">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Criar evento
+        </a>
+        <a href="@meusEventos" class="nav-item">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8a2 2 0 0 0 0 4v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4a2 2 0 0 0 0-4V4a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1z"/><path d="M14 3v14" stroke-dasharray="2 2"/></svg>Meus eventos
+        </a>
+        @if (logado)
+        {
+            <details class="drop conta">
+                <summary aria-label="Minha conta"><span class="av">@Texto.Iniciais(nome)</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+                <div class="drop-painel lista">
+                    <div class="quem"><b>@nome</b><small>@(admin ? "Administrador" : "Produtor")</small></div>
+                    <a href="/painel">Meus eventos</a>
+                    <a href="/eventos/novo">Criar evento</a>
+                    <a href="/minha-conta">Minha conta e perfil</a>
+                    @if (admin) { <a href="/organizadores">Produtores</a> }
+                    <hr>
+                    <form method="post" asp-antiforgery="true" action="/sair"><button>Sair</button></form>
+                </div>
+            </details>
+        }
+        else
+        {
+            <a class="btn peq entrar" href="/entrar">Entrar</a>
+        }
+    </nav>
+
+    @* Celular: tudo numa gaveta *@
+    <details class="drop gaveta">
+        <summary aria-label="Abrir menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></summary>
+        <div class="drop-painel gaveta-painel">
+            @if (logado)
+            {
+                <div class="quem"><span class="av">@Texto.Iniciais(nome)</span><div><b>@nome</b><small>@(admin ? "Administrador" : "Produtor")</small></div></div>
+            }
+            <a class="gaveta-destaque" href="@meusEventos">Meus eventos</a>
+            <a class="gaveta-destaque" href="@criarEvento">Criar evento</a>
+            <b class="gaveta-titulo">Explorar</b>
+            <a href="/eventos">Todos os eventos</a>
+            @foreach (var (k, n) in atalhos.Take(3)) { <a href="/eventos?quando=@k">@n</a> }
+            <a href="/eventos?online=1">Online</a>
+            <a href="/eventos?gratis=1">Gratuitos</a>
+            <b class="gaveta-titulo">Categorias</b>
+            <div class="gaveta-cats">@foreach (var c in categorias) { <a href="/eventos?categoria=@Texto.SlugCategoria(c)">@Texto.NomeCategoria(c)</a> }</div>
+            <hr>
+            @if (logado)
+            {
+                <a href="/minha-conta">Minha conta e perfil</a>
+                @if (admin) { <a href="/organizadores">Produtores</a> }
+                <form method="post" asp-antiforgery="true" action="/sair"><button>Sair</button></form>
+            }
+            else
+            {
+                <a class="btn pri" href="/entrar">Entrar</a>
+                <a href="/criar-conta">Criar conta de produtor</a>
+            }
+        </div>
+    </details>
+</header>
+
+<nav class="faixa-categorias" aria-label="Atalhos e categorias">
+    <a href="/eventos" class="@(tudoAtivo ? "on" : "")">Tudo</a>
+    <a href="/eventos?quando=hoje" class="@(Ativo("quando", "hoje") ? "on" : "")">Hoje</a>
+    <a href="/eventos?quando=fim-de-semana" class="@(Ativo("quando", "fim-de-semana") ? "on" : "")">Fim de semana</a>
+    <a href="/eventos?online=1" class="@(Ativo("online", "1") ? "on" : "")">Online</a>
+    <a href="/eventos?gratis=1" class="@(Ativo("gratis", "1") ? "on" : "")">Gratuitos</a>
+    <span class="sep" aria-hidden="true"></span>
+    @foreach (var c in categorias.Where(c => c != CategoriaEvento.Outros))
+    {
+        <a href="/eventos?categoria=@Texto.SlugCategoria(c)" class="@(Ativo("categoria", Texto.SlugCategoria(c)) ? "on" : "")">@Texto.NomeCategoria(c)</a>
+    }
+</nav>

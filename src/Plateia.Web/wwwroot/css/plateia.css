@@ -849,3 +849,69 @@ body.publico .compartilhar-evento { --c: var(--sup); width: 100%; margin-top: 12
 .tipo-linha .desc, .tipo-linha .esp:not([hidden]) ~ .desc { grid-column: 1 / -1; order: 9; }
 .tipo-linha:has(.esp[hidden]) .ate { grid-column: 1 / -1; }
 @media (max-width: 760px) { .tipo-linha .ate, .tipo-linha .esp:not([hidden]) ~ .ate, .tipo-linha .esp { grid-column: 1 / -1; } }
+
+/* ==========================================================================
+   Menu da vitrine
+   ========================================================================== */
+body.publico .topo-publico { grid-template-columns: auto auto minmax(0, 1fr) auto auto; gap: 14px; padding-block: 12px; border-bottom: 0; }
+.drop { position: relative; }
+.drop > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; border-radius: 99px; font-weight: 600; font-size: 14px; color: var(--texto); user-select: none; transition: background-color .2s; }
+.drop > summary::-webkit-details-marker { display: none; }
+.drop > summary:hover, .drop[open] > summary { background: var(--sup-2); }
+.drop > summary svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .25s var(--mola); }
+.drop[open] > summary svg { transform: rotate(180deg); }
+.drop-painel { position: absolute; top: calc(100% + 8px); z-index: 40; background: var(--sup); border: 1px solid var(--linha); border-radius: 18px; box-shadow: 0 24px 60px -20px rgb(23 19 15 / .35); animation: abrir .2s var(--suave-saida) both; }
+.drop-painel a, .drop-painel button { display: block; width: 100%; text-align: left; padding: 8px 10px; border-radius: 10px; text-decoration: none; font-size: 14px; color: var(--texto); background: none; border: 0; cursor: pointer; font-weight: 500; }
+.drop-painel a:hover, .drop-painel button:hover { background: var(--sup-2); }
+.drop-painel hr { border: 0; border-top: 1px solid var(--linha); margin: 6px 0; }
+.drop-painel b { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--suave); padding: 4px 10px 6px; }
+
+.mega { left: 0; width: min(760px, calc(100vw - 32px)); display: grid; grid-template-columns: 1fr 1fr 1.6fr; gap: 8px; padding: 16px; transform-origin: top left; }
+.mega-cats > div { display: grid; grid-template-columns: 1fr 1fr; }
+.lista { right: 0; width: 240px; padding: 8px; transform-origin: top right; }
+.quem { display: flex; gap: 10px; align-items: center; padding: 8px 10px 10px; border-bottom: 1px solid var(--linha); margin-bottom: 6px; }
+.quem b { display: block; padding: 0; font-size: 14px; text-transform: none; letter-spacing: 0; color: var(--texto); }
+.quem small { color: var(--suave); font-size: 12px; }
+.drop.conta > summary { padding: 0 8px 0 4px; }
+.drop.conta .av { width: 32px; height: 32px; background: var(--texto); color: var(--bg); }
+
+.nav-publico .nav-item { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; height: 40px; padding: 0 12px; border-radius: 99px; font-weight: 600; font-size: 14px; color: var(--texto) !important; white-space: nowrap; }
+.nav-publico .nav-item svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.nav-publico .nav-item:hover { background: var(--sup-2); }
+.drop.gaveta { display: none; }
+
+.faixa-categorias { position: sticky; top: 64px; z-index: 19; display: flex; gap: 4px; align-items: center; overflow-x: auto; scrollbar-width: none; padding: 6px clamp(16px, 4vw, 40px) 10px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--linha); }
+.faixa-categorias::-webkit-scrollbar { display: none; }
+.faixa-categorias a { flex: none; padding: 7px 13px; border-radius: 99px; text-decoration: none; font-size: 13px; font-weight: 600; color: var(--suave); transition: color .2s, background-color .2s; }
+.faixa-categorias a:hover { color: var(--texto); background: var(--sup-2); }
+.faixa-categorias a.on { color: var(--bg); background: var(--texto); }
+.faixa-categorias .sep { flex: none; width: 1px; height: 20px; background: var(--linha); margin: 0 6px; }
+
+@media (max-width: 1080px) {
+    body.publico .topo-publico { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+    .drop.explorar { display: none; }
+    .nav-publico .nav-item:first-child { display: none; }
+}
+@media (max-width: 760px) {
+    body.publico .topo-publico { grid-template-columns: auto 1fr auto; row-gap: 10px; }
+    .busca-topo { grid-column: 1 / -1; grid-row: 2; }
+    .nav-publico { display: none; }
+    .drop.gaveta { display: block; grid-column: 3; justify-self: end; }
+    .drop.gaveta > summary { width: 44px; height: 44px; padding: 0; justify-content: center; background: var(--sup-2); }
+    .drop.gaveta > summary svg { width: 22px; height: 22px; transform: none !important; }
+    .gaveta-painel { position: fixed; top: 64px; right: 12px; left: 12px; max-height: calc(100dvh - 80px); overflow-y: auto; padding: 12px; display: grid; gap: 2px; }
+    .gaveta-painel .gaveta-destaque { font-size: 16px; font-weight: 700; padding: 12px 10px; }
+    .gaveta-titulo { margin-top: 8px; }
+    .gaveta-cats { display: grid; grid-template-columns: 1fr 1fr; }
+    .gaveta-painel .btn.pri { text-align: center; margin: 4px 0; color: var(--bg); }
+    .faixa-categorias { top: 116px; }
+}
+@media (max-width: 760px) {
+    .drop.gaveta[open]::before { content: ""; position: fixed; inset: 0; background: rgb(23 19 15 / .45); backdrop-filter: blur(2px); animation: aparecer .2s both; }
+    .drop.gaveta[open] > summary { position: relative; z-index: 41; background: var(--texto); color: var(--bg); }
+    .gaveta-painel { z-index: 41; }
+    body:has(.drop.gaveta[open]) { overflow: hidden; }
+}
+@keyframes aparecer { from { opacity: 0; } }
+/* backdrop-filter prende elementos fixed dentro do cabeçalho: desliga enquanto a gaveta está aberta */
+body.publico .topo-publico:has(.drop.gaveta[open]) { backdrop-filter: none; background: var(--bg); }

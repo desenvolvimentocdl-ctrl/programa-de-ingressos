@@ -1,8 +1,6 @@
 @{
     var cor = ViewData["Cor"] as string ?? "#FF6B4A";
     var tinta = Texto.TintaSobre(cor);
-    var logado = User.Identity?.IsAuthenticated == true;
-    var busca = Context.Request.Query["q"].ToString();
 }
 <!doctype html>
 <html lang="pt-BR">
@@ -23,20 +21,7 @@
 </head>
 <body class="publico" style="--cor:@cor;--tinta:@tinta">
 @RenderSection("Topo", required: false)
-<header class="topo-publico">
-    <a class="marca" href="/" aria-label="Plateia, início"><partial name="_Marca" /></a>
-    <form class="busca-topo" action="/eventos" method="get" role="search">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input type="search" name="q" value="@busca" placeholder="Buscar eventos, produtores, cidades" aria-label="Buscar eventos">
-    </form>
-    <nav class="nav-publico" aria-label="Menu">
-        <a href="/eventos">Explorar</a>
-        <a href="@(logado ? "/eventos/novo" : "/criar-conta")">Criar evento</a>
-        @if (logado) { <a class="btn peq" href="/painel">Meu painel</a> }
-        else { <a class="btn peq" href="/entrar">Entrar</a> }
-    </nav>
-    @RenderSection("TopoDireita", required: false)
-</header>
+<partial name="_MenuPublico" />
 @RenderBody()
 <footer class="rodape-publico">
     <div class="rodape-grade">

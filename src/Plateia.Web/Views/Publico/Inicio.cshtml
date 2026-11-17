@@ -32,12 +32,6 @@
 </section>
 
 <main class="vitrine">
-    <nav class="categorias" aria-label="Categorias">
-        @foreach (var c in Enum.GetValues<CategoriaEvento>().Where(c => Model.Categorias.ContainsKey(c)))
-        {
-            <a href="/eventos?categoria=@Texto.SlugCategoria(c)">@Texto.NomeCategoria(c) <b>@Model.Categorias[c]</b></a>
-        }
-    </nav>
 
     @if (Model.Destaques.Count > 0)
     {

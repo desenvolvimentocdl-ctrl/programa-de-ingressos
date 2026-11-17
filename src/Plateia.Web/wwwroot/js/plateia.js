@@ -392,6 +392,20 @@
         }));
     }
 
+    // ---------- Menu da vitrine: um aberto por vez, fecha ao clicar fora ou com Esc ----------
+    const drops = $$("details.drop");
+    if (drops.length) {
+        drops.forEach(d => d.addEventListener("toggle", () => {
+            if (d.open) drops.forEach(o => { if (o !== d) o.open = false; });
+        }));
+        document.addEventListener("click", e => drops.forEach(d => { if (d.open && !d.contains(e.target)) d.open = false; }));
+        document.addEventListener("keydown", e => {
+            if (e.key !== "Escape") return;
+            const aberto = drops.find(d => d.open);
+            if (aberto) { aberto.open = false; $("summary", aberto).focus(); }
+        });
+    }
+
     // ---------- Portaria ----------
     const portaria = $("#form-checkin");
     if (portaria) {

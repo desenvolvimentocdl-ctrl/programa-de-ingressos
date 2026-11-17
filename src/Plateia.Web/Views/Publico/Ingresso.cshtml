@@ -9,10 +9,8 @@
     var link = (string)ViewBag.Link;
     var tinta = Texto.TintaSobre(e.Cor);
 }
-@section TopoDireita {
-    <a class="btn fantasma peq" href="/e/@e.Slug">Página do evento</a>
-}
 <div class="pagina-ingresso">
+    <a class="voltar" href="/e/@e.Slug" style="margin:0">← @e.Titulo</a>
     @if (novo)
     {
         <div style="text-align:center;display:grid;gap:6px">
