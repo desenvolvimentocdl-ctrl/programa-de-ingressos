@@ -8,12 +8,32 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Plateia.Web.Controllers;
 
-public class EventosController(AppDbContext db, EventoService eventos) : BaseController
+public class EventosController(AppDbContext db, EventoService eventos, PagamentoService pagamentos) : BaseController
 {
+    public static readonly (string Chave, string Nome)[] Visoes = [("proximos", "Próximos"), ("rascunhos", "Rascunhos"), ("passados", "Passados"), ("todos", "Todos")];
+
     [HttpGet("/")]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string? ver)
     {
-        var lista = await eventos.Visiveis(Eu)
+        ver = Visoes.Any(v => v.Chave == ver) ? ver! : "proximos";
+        var agora = DateTime.UtcNow.AddHours(-6);
+        var consulta = eventos.Visiveis(Eu);
+        ViewBag.Contagem = new Dictionary<string, int>
+        {
+            ["proximos"] = await consulta.CountAsync(e => e.Status == StatusEvento.Publicado && (e.FimEm ?? e.InicioEm) >= agora),
+            ["rascunhos"] = await consulta.CountAsync(e => e.Status == StatusEvento.Rascunho),
+            ["passados"] = await consulta.CountAsync(e => e.Status != StatusEvento.Rascunho && (e.Status != StatusEvento.Publicado || (e.FimEm ?? e.InicioEm) < agora)),
+            ["todos"] = await consulta.CountAsync()
+        };
+        ViewBag.Ver = ver;
+        consulta = ver switch
+        {
+            "proximos" => consulta.Where(e => e.Status == StatusEvento.Publicado && (e.FimEm ?? e.InicioEm) >= agora),
+            "rascunhos" => consulta.Where(e => e.Status == StatusEvento.Rascunho),
+            "passados" => consulta.Where(e => e.Status != StatusEvento.Rascunho && (e.Status != StatusEvento.Publicado || (e.FimEm ?? e.InicioEm) < agora)),
+            _ => consulta
+        };
+        var lista = await consulta
             .OrderBy(e => e.Status == StatusEvento.Encerrado || e.Status == StatusEvento.Cancelado)
             .ThenBy(e => e.InicioEm)
             .Select(e => new CartaoEvento(e.Id, e.Titulo, e.Slug, e.Local, e.InicioEm, e.Capacidade, e.Cor, e.Status,
@@ -63,14 +83,15 @@ public class EventosController(AppDbContext db, EventoService eventos) : BaseCon
         decimal Dec(string? s) => decimal.TryParse((s ?? "").Replace("R$", "").Trim(), System.Globalization.NumberStyles.Number, Hora.PtBr, out var v) ? v : 0;
 
         var ids = f["tipo_id"]; var nomes = f["tipo_nome"]; var descs = f["tipo_desc"];
-        var precos = f["tipo_preco"]; var qtds = f["tipo_qtd"]; var remover = f["tipo_remover"];
+        var precos = f["tipo_preco"]; var qtds = f["tipo_qtd"]; var remover = f["tipo_remover"]; var ates = f["tipo_ate"];
         var tipos = new List<DadosTipo>();
         for (var i = 0; i < nomes.Count; i++)
             tipos.Add(new DadosTipo(
                 int.TryParse(ids.ElementAtOrDefault(i), out var tid) ? tid : null,
                 nomes[i] ?? "", descs.ElementAtOrDefault(i), Dec(precos.ElementAtOrDefault(i)),
                 int.TryParse(qtds.ElementAtOrDefault(i), out var q) ? q : null,
-                remover.ElementAtOrDefault(i) == "1"));
+                remover.ElementAtOrDefault(i) == "1",
+                DateTime.TryParse(ates.ElementAtOrDefault(i), out var ate) ? Hora.ParaUtc(ate) : null));
 
         var inicio = Data("inicio") ?? throw new RegraNegocioException("Informe a data e a hora de início.");
         var dados = new DadosEvento(
@@ -90,6 +111,7 @@ public class EventosController(AppDbContext db, EventoService eventos) : BaseCon
     {
         var e = await eventos.ObterAsync(id, Eu);
         if (e is null) return NotFound();
+        ViewBag.Online = pagamentos.Online;
         return View(await ResumoEvento.CarregarAsync(db, e));
     }
 
@@ -100,6 +122,22 @@ public class EventosController(AppDbContext db, EventoService eventos) : BaseCon
         var e = await eventos.ObterAsync(id, Eu);
         if (e is null) return NotFound();
         return PartialView("_AoVivo", (await ResumoEvento.CarregarAsync(db, e)).Recentes(8));
+    }
+
+    [HttpPost("/eventos/{id:int}/duplicar")]
+    public async Task<IActionResult> Duplicar(int id)
+    {
+        var e = await eventos.DuplicarAsync(id, Eu);
+        TempData["msg"] = "Cópia criada como rascunho. Ajuste a data e publique.";
+        return Redirect($"/eventos/{e.Id}/editar");
+    }
+
+    [HttpPost("/eventos/{id:int}/excluir")]
+    public async Task<IActionResult> Excluir(int id)
+    {
+        await eventos.ExcluirAsync(id, Eu);
+        TempData["msg"] = "Evento excluído.";
+        return Redirect("/");
     }
 
     async Task CarregarOrganizadores()

@@ -14,8 +14,9 @@ public class InscricaoService(IAppDbContext db)
     /// não ocuparem o mesmo último lugar.
     /// </summary>
     public async Task<Inscricao> InscreverAsync(int eventoId, int tipoId, string nome, string email, string? telefone,
-        OrigemInscricao origem, StatusPagamento? pagamento = null, string? observacao = null)
+        OrigemInscricao origem, StatusPagamento? pagamento = null, string? observacao = null, string? cupom = null, string? canal = null)
     {
+        var codigoCupom = DivulgacaoService.NormalizarCupom(cupom);
         var n = Utilidades.Limpo(nome, 160) ?? throw new RegraNegocioException("Informe o nome.");
         var e = (email ?? "").Trim().ToLowerInvariant();
         if (!Utilidades.EmailValido(e) || e.Length > 180) throw new RegraNegocioException("Informe um e-mail válido.");
@@ -37,8 +38,20 @@ public class InscricaoService(IAppDbContext db)
             {
                 if (ev.Status != StatusEvento.Publicado || !ev.InscricoesAbertas)
                     throw new RegraNegocioException("As inscrições deste evento estão fechadas.");
+                if (tipo.VendaEncerrada(DateTime.UtcNow))
+                    throw new RegraNegocioException($"As vendas de \"{tipo.Nome}\" já encerraram.");
                 if (await db.Inscricoes.AnyAsync(i => i.EventoId == eventoId && i.Email == e && i.Status == StatusInscricao.Confirmada))
                     throw new RegraNegocioException("Este e-mail já tem inscrição neste evento. Se perdeu o ingresso, fale com o organizador.");
+            }
+
+            Cupom? cp = null;
+            if (codigoCupom.Length > 0)
+            {
+                cp = await db.Cupons.FirstOrDefaultAsync(c => c.EventoId == eventoId && c.Codigo == codigoCupom && c.Ativo);
+                if (cp is null || cp.ValidoAte is { } ate && DateTime.UtcNow > ate)
+                    throw new RegraNegocioException("Cupom inválido ou vencido.");
+                if (cp.Limite is { } lim && await db.Inscricoes.CountAsync(i => i.CupomId == cp.Id && i.Status == StatusInscricao.Confirmada) >= lim)
+                    throw new RegraNegocioException("Este cupom já atingiu o limite de usos.");
             }
 
             var ativos = db.Inscricoes.Where(i => i.EventoId == eventoId && i.Status == StatusInscricao.Confirmada);
@@ -50,11 +63,14 @@ public class InscricaoService(IAppDbContext db)
             var codigo = Utilidades.NovoCodigo();
             while (await db.Inscricoes.AnyAsync(i => i.Codigo == codigo)) codigo = Utilidades.NovoCodigo();
 
+            var desconto = cp?.DescontoSobre(tipo.Preco) ?? 0;
+            var valor = tipo.Preco - desconto;
             var ins = new Inscricao
             {
                 EventoId = eventoId, TipoIngressoId = tipo.Id, Nome = n, Email = e, Telefone = fone, Codigo = codigo,
-                Origem = origem, Valor = tipo.Preco, Observacao = Utilidades.Limpo(observacao, 500),
-                Pagamento = tipo.Gratuito ? StatusPagamento.Cortesia : pagamento ?? StatusPagamento.Pendente
+                Origem = origem, Valor = valor, Desconto = desconto, CupomId = cp?.Id,
+                Canal = DivulgacaoService.NormalizarCanal(canal), Observacao = Utilidades.Limpo(observacao, 500),
+                Pagamento = valor <= 0 ? StatusPagamento.Cortesia : pagamento ?? StatusPagamento.Pendente
             };
             if (ins.Pagamento != StatusPagamento.Pendente) ins.PagoEm = DateTime.UtcNow;
             db.Inscricoes.Add(ins);

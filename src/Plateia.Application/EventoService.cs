@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Plateia.Application;
 
-public record DadosTipo(int? Id, string Nome, string? Descricao, decimal Preco, int? Quantidade, bool Remover);
+public record DadosTipo(int? Id, string Nome, string? Descricao, decimal Preco, int? Quantidade, bool Remover, DateTime? VendasAteUtc = null);
 
 public record DadosEvento(
     string Titulo, string? Subtitulo, string? Descricao, string Local, string? Endereco,
@@ -100,10 +100,39 @@ public class EventoService(IAppDbContext db)
             tipo.Descricao = Utilidades.Limpo(t.Descricao, 300);
             tipo.Preco = Math.Round(t.Preco, 2);
             tipo.Quantidade = t.Quantidade;
+            tipo.VendasAte = t.VendasAteUtc;
             tipo.Ordem = ordem++;
             tipo.Ativo = true;
             if (existente is null) e.Tipos.Add(tipo);
         }
+    }
+
+    /// <summary>Cria uma cópia em rascunho (mesmos dados e ingressos, sem inscrições), para eventos que se repetem.</summary>
+    public async Task<Evento> DuplicarAsync(int id, UsuarioAtual eu)
+    {
+        var o = await ObterAsync(id, eu) ?? throw new RegraNegocioException("Evento não encontrado.");
+        var titulo = o.Titulo.Length > 150 ? o.Titulo[..150] : o.Titulo;
+        var e = new Evento
+        {
+            Titulo = titulo + " (cópia)", Slug = await SlugLivreAsync(titulo), Subtitulo = o.Subtitulo, Descricao = o.Descricao,
+            Local = o.Local, Endereco = o.Endereco, InicioEm = o.InicioEm, FimEm = o.FimEm, Capacidade = o.Capacidade, Cor = o.Cor,
+            Status = StatusEvento.Rascunho, InscricoesAbertas = true, InstrucoesPagamento = o.InstrucoesPagamento, OrganizadorId = o.OrganizadorId,
+            Tipos = o.Tipos.Where(t => t.Ativo).OrderBy(t => t.Ordem)
+                .Select(t => new TipoIngresso { Nome = t.Nome, Descricao = t.Descricao, Preco = t.Preco, Quantidade = t.Quantidade, Ordem = t.Ordem }).ToList()
+        };
+        db.Eventos.Add(e);
+        await db.SaveChangesAsync();
+        return e;
+    }
+
+    /// <summary>Só exclui eventos sem nenhuma inscrição; com inscrições, o caminho é marcar como Cancelado.</summary>
+    public async Task ExcluirAsync(int id, UsuarioAtual eu)
+    {
+        var e = await ObterAsync(id, eu) ?? throw new RegraNegocioException("Evento não encontrado.");
+        if (await db.Inscricoes.AnyAsync(i => i.EventoId == id))
+            throw new RegraNegocioException("Este evento já tem inscrições. Em vez de excluir, marque como Cancelado.");
+        db.Eventos.Remove(e);
+        await db.SaveChangesAsync();
     }
 
     async Task<string> SlugLivreAsync(string titulo)

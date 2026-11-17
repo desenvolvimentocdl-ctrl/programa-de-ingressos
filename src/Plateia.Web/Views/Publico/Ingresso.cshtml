@@ -42,7 +42,7 @@
             <div class="codigo">@Model.Codigo</div>
             <dl>
                 <div><dt>Participante</dt><dd>@Model.Nome</dd></div>
-                <div><dt>Pagamento</dt><dd><span class="pilula @Texto.ClassePagamento(Model.Pagamento)">@Texto.NomePagamento(Model.Pagamento)</span></dd></div>
+                <div><dt>Pagamento</dt><dd><span class="pilula @Texto.ClassePagamento(Model.Pagamento)">@Texto.NomePagamento(Model.Pagamento)</span>@if (Model.Pagamento == StatusPagamento.Pago && Model.Valor > 0) { <span class="forma">@Hora.Dinheiro(Model.Valor)@(Model.FormaPagamento is { } fp ? $" · {fp}" : "")</span> }</dd></div>
                 <div><dt>Quando</dt><dd>@Hora.DataLonga(e.InicioEm)</dd></div>
                 <div><dt>Onde</dt><dd>@e.Local@(e.Endereco is { } end ? $" · {end}" : "")</dd></div>
             </dl>
@@ -51,12 +51,30 @@
 
     @if (Model.Ativa && Model.Pagamento == StatusPagamento.Pendente && Model.Valor > 0)
     {
-        <div class="pagar">
-            <b>Falta pagar @Hora.Dinheiro(Model.Valor)</b>
-            <span>@(e.InstrucoesPagamento ?? "A organização vai entrar em contato com as instruções de pagamento.")</span>
-            <span style="opacity:.75">Informe o código <b class="mono">@Model.Codigo</b> ao enviar o comprovante.</span>
-        </div>
+        var podePagar = ViewBag.Online == true && e.Status == StatusEvento.Publicado && (e.FimEm ?? e.InicioEm) > DateTime.UtcNow;
+        if (podePagar)
+        {
+            <form class="pagar-online" method="post" asp-antiforgery="true" action="/ingresso/@Model.Codigo/pagar">
+                <b>Falta pagar @Hora.Dinheiro(Model.Valor)</b>
+                <span style="font-size:14px;opacity:.85">Seu lugar está reservado. Conclua o pagamento para garantir o ingresso.</span>
+                <button class="btn">Pagar com a Cielo · cartão ou Pix</button>
+                <small>Você vai para a página segura da Cielo. Depois de pagar, volte a este link: o ingresso atualiza sozinho.</small>
+            </form>
+            @if (e.InstrucoesPagamento is { } outras)
+            {
+                <div class="pagar"><b>Outras formas de pagar</b><span>@outras</span></div>
+            }
+        }
+        else
+        {
+            <div class="pagar">
+                <b>Falta pagar @Hora.Dinheiro(Model.Valor)</b>
+                <span>@(e.InstrucoesPagamento ?? "A organização vai entrar em contato com as instruções de pagamento.")</span>
+                <span style="opacity:.75">Informe o código <b class="mono">@Model.Codigo</b> ao enviar o comprovante.</span>
+            </div>
+        }
     }
+    @if (TempData["erro"] is string erroPg) { <div class="alerta-caixa erro" role="alert">@erroPg</div> }
 
     @if (Model.Ativa)
     {

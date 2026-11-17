@@ -43,6 +43,7 @@ public class Evento
 
     public List<TipoIngresso> Tipos { get; set; } = new();
     public List<Inscricao> Inscricoes { get; set; } = new();
+    public List<Cupom> Cupons { get; set; } = new();
 
     public bool Visivel => Status != StatusEvento.Rascunho;
 }
@@ -59,8 +60,11 @@ public class TipoIngresso
     public int? Quantidade { get; set; }
     public int Ordem { get; set; }
     public bool Ativo { get; set; } = true;
+    /// <summary>Fim das vendas deste tipo (ex.: "1º lote até 10/12"). Gravado em UTC; vazio = até o evento.</summary>
+    public DateTime? VendasAte { get; set; }
 
     public bool Gratuito => Preco <= 0;
+    public bool VendaEncerrada(DateTime agoraUtc) => VendasAte is { } v && agoraUtc > v;
 }
 
 public enum StatusInscricao { Confirmada = 0, Cancelada = 1 }
@@ -86,13 +90,58 @@ public class Inscricao
     public StatusPagamento Pagamento { get; set; }
     /// <summary>Preço do tipo de ingresso no momento da inscrição.</summary>
     public decimal Valor { get; set; }
+    /// <summary>Desconto aplicado por cupom (Valor já é o preço final).</summary>
+    public decimal Desconto { get; set; }
+    public int? CupomId { get; set; }
+    public Cupom? Cupom { get; set; }
     public string? FormaPagamento { get; set; }
     public DateTime? PagoEm { get; set; }
     public DateTime? CheckinEm { get; set; }
     public DateTime? CanceladaEm { get; set; }
     public OrigemInscricao Origem { get; set; }
+    /// <summary>Canal de divulgação de onde a pessoa veio (instagram, whatsapp…), pelo link rastreável.</summary>
+    public string? Canal { get; set; }
+
+    // Pagamento online pela Cielo (Link de Pagamento).
+    public string? CieloLinkId { get; set; }
+    public string? CieloLinkUrl { get; set; }
+    /// <summary>Número do pedido na Cielo (checkout_cielo_order_number), quando a pessoa conclui o pagamento.</summary>
+    public string? CieloPedido { get; set; }
+    public DateTime? CieloConsultadoEm { get; set; }
     public string? Observacao { get; set; }
     public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
 
     public bool Ativa => Status == StatusInscricao.Confirmada;
+}
+
+public enum TipoDesconto { Percentual = 0, Valor = 1 }
+
+/// <summary>Cupom de desconto de um evento (ex.: parceiros, divulgação, equipe).</summary>
+public class Cupom
+{
+    public int Id { get; set; }
+    public int EventoId { get; set; }
+    public Evento? Evento { get; set; }
+    public string Codigo { get; set; } = "";
+    public TipoDesconto Tipo { get; set; }
+    /// <summary>Percentual (0–100) ou valor em reais.</summary>
+    public decimal Valor { get; set; }
+    /// <summary>Quantas inscrições podem usar; vazio = sem limite.</summary>
+    public int? Limite { get; set; }
+    public DateTime? ValidoAte { get; set; }
+    public bool Ativo { get; set; } = true;
+    public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
+
+    public decimal DescontoSobre(decimal preco) =>
+        Math.Min(preco, Math.Round(Tipo == TipoDesconto.Percentual ? preco * Valor / 100m : Valor, 2));
+}
+
+/// <summary>Visitas à página pública por canal e por dia (para medir a divulgação).</summary>
+public class VisitaEvento
+{
+    public int Id { get; set; }
+    public int EventoId { get; set; }
+    public string Canal { get; set; } = "";
+    public DateTime Dia { get; set; }
+    public int Visitas { get; set; }
 }

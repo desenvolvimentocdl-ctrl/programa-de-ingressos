@@ -183,6 +183,143 @@
         });
     }
 
+    // Copiar o texto de um campo (mensagem pronta)
+    document.addEventListener("click", async e => {
+        const b = e.target.closest("[data-copiar-de]");
+        if (!b) return;
+        const v = $(b.dataset.copiarDe)?.value ?? "";
+        try { await navigator.clipboard.writeText(v); aviso("Mensagem copiada."); } catch { prompt("Copie:", v); }
+    });
+
+    // ---------- Página pública: cupom de desconto ----------
+    const formIns = $("#form-inscricao");
+    if (formIns && $("[data-aplicar-cupom]", formIns)) {
+        const campo = $("input[name=cupom]", formIns), msg = $(".cupom-msg", formIns);
+        const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+        const fmt = v => v <= 0 ? "Gratuito" : brl.format(v).replace(",00", "");
+        const precos = $$(".preco[data-preco]", formIns);
+        const original = () => precos.forEach(p => p.textContent = fmt(+p.dataset.preco));
+        const aplicar = async () => {
+            const codigo = campo.value.trim();
+            original();
+            msg.textContent = ""; msg.className = "cupom-msg";
+            if (!codigo) return;
+            try {
+                const r = await (await fetch(`${formIns.dataset.cupomUrl}?codigo=${encodeURIComponent(codigo)}`)).json();
+                msg.textContent = r.texto;
+                msg.classList.add(r.valido ? "ok" : "erro");
+                if (!r.valido) return;
+                precos.forEach(p => {
+                    const base = +p.dataset.preco;
+                    if (base <= 0) return;
+                    const desc = Math.min(base, r.tipo === "Percentual" ? base * r.valor / 100 : r.valor);
+                    p.innerHTML = `<s>${fmt(base)}</s>${fmt(Math.round((base - desc) * 100) / 100)}`;
+                });
+            } catch { }
+        };
+        $("[data-aplicar-cupom]", formIns).addEventListener("click", aplicar);
+        campo.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); aplicar(); } });
+        if (campo.value) aplicar();
+    }
+
+    // ---------- Divulgação: canal personalizado ----------
+    const canalLivre = $("#canal-livre");
+    if (canalLivre) {
+        const slug = t => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+        const montar = () => `${canalLivre.dataset.base}?origem=${slug($("input", canalLivre).value) || "…"}`;
+        $("input", canalLivre).addEventListener("input", () => $("[data-saida]", canalLivre).textContent = montar());
+        canalLivre.addEventListener("submit", async e => {
+            e.preventDefault();
+            if (!slug($("input", canalLivre).value)) { aviso("Digite o nome do canal.", true); return; }
+            try { await navigator.clipboard.writeText(montar()); aviso("Link copiado."); } catch { prompt("Copie:", montar()); }
+        });
+    }
+
+    // ---------- Divulgação: artes para stories e feed (desenhadas no navegador) ----------
+    const artes = $("[data-arte]");
+    if (artes) {
+        const d = artes.dataset;
+        const carregarQr = new Promise(ok => {
+            const img = new Image();
+            img.onload = () => ok(img); img.onerror = () => ok(null);
+            img.src = d.qr;
+        });
+        const quebrar = (ctx, texto, largura) => {
+            const linhas = []; let atual = "";
+            for (const p of texto.split(/\s+/)) {
+                const teste = atual ? atual + " " + p : p;
+                if (ctx.measureText(teste).width > largura && atual) { linhas.push(atual); atual = p; } else atual = teste;
+            }
+            if (atual) linhas.push(atual);
+            return linhas;
+        };
+        const desenhar = async canvas => {
+            const W = canvas.width, H = canvas.height, stories = canvas.dataset.formato === "stories";
+            const ctx = canvas.getContext("2d");
+            const m = 84;
+            ctx.fillStyle = d.cor; ctx.fillRect(0, 0, W, H);
+            // plateia em arco ao fundo
+            ctx.save(); ctx.globalAlpha = .16; ctx.fillStyle = d.tinta;
+            const cx = W / 2, cy = H * (stories ? .64 : .78);
+            for (let fila = 0; fila < 9; fila++) {
+                const r = 260 + fila * 62, n = 14 + fila * 4;
+                for (let k = 0; k <= n; k++) {
+                    const a = Math.PI + (Math.PI * k / n);
+                    ctx.beginPath(); ctx.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r * .62, 9, 0, 7); ctx.fill();
+                }
+            }
+            ctx.restore();
+            ctx.fillStyle = d.tinta;
+            ctx.font = "600 34px 'JetBrains Mono', monospace";
+            ctx.fillText(d.numero, m, m + 20);
+            ctx.textAlign = "right"; ctx.fillText(d.data.split("·")[1]?.trim() ?? "", W - m, m + 20); ctx.textAlign = "left";
+            // título: diminui a fonte até caber
+            let tam = stories ? 168 : 150, linhas;
+            do { ctx.font = `400 ${tam}px Anton, Impact, sans-serif`; linhas = quebrar(ctx, d.titulo.toUpperCase(), W - m * 2); tam -= 6; }
+            while (linhas.length * tam * .98 > H * (stories ? .36 : .34) && tam > 60);
+            let y = stories ? 330 : 200;
+            for (const l of linhas) { y += tam * .98; ctx.fillText(l, m, y); }
+            if (d.sub) {
+                ctx.font = "500 40px 'Instrument Sans', sans-serif";
+                for (const l of quebrar(ctx, d.sub, W - m * 2).slice(0, 2)) { y += 56; ctx.fillText(l, m, y + 20); }
+            }
+            // canhoto do ingresso, com recortes e picote
+            const hTicket = stories ? 520 : 330, yT = H - hTicket - m;
+            ctx.fillStyle = "#FFFFFF";
+            ctx.beginPath(); ctx.roundRect(m, yT, W - m * 2, hTicket, 36); ctx.fill();
+            ctx.fillStyle = d.cor;
+            [m, W - m].forEach(x => { ctx.beginPath(); ctx.arc(x, yT + 120, 26, 0, 7); ctx.fill(); });
+            ctx.strokeStyle = "#D9D1C7"; ctx.setLineDash([14, 12]); ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.moveTo(m + 40, yT + 120); ctx.lineTo(W - m - 40, yT + 120); ctx.stroke(); ctx.setLineDash([]);
+            ctx.fillStyle = "#17130F";
+            ctx.font = "700 46px 'Instrument Sans', sans-serif"; ctx.fillText(d.data.split("·")[0].trim(), m + 44, yT + 78);
+            ctx.font = "500 36px 'Instrument Sans', sans-serif"; ctx.fillStyle = "#6B6259";
+            ctx.fillText(d.local, m + 44, yT + 190);
+            ctx.font = "700 44px 'JetBrains Mono', monospace"; ctx.fillStyle = "#17130F";
+            ctx.fillText(d.preco, m + 44, yT + 260);
+            if (stories) {
+                ctx.font = "400 64px Anton, Impact, sans-serif"; ctx.fillText("INSCRIÇÕES ABERTAS", m + 44, yT + 380);
+                ctx.font = "500 30px 'JetBrains Mono', monospace"; ctx.fillStyle = "#6B6259";
+                ctx.fillText(d.link.length > 34 ? d.link.slice(0, 33) + "…" : d.link, m + 44, yT + 440);
+            }
+            const qr = await carregarQr;
+            if (qr) { const q = stories ? 250 : 170; ctx.drawImage(qr, W - m - 44 - q, yT + (stories ? 190 : 140), q, q); }
+        };
+        (async () => {
+            try { await Promise.all(["400 100px Anton", "500 40px 'Instrument Sans'", "700 40px 'Instrument Sans'", "600 30px 'JetBrains Mono'", "700 30px 'JetBrains Mono'"].map(f => document.fonts.load(f))); } catch { }
+            for (const c of $$("canvas", artes)) await desenhar(c);
+        })();
+        artes.addEventListener("click", e => {
+            const b = e.target.closest("[data-baixar]");
+            if (!b) return;
+            $(`canvas[data-formato=${b.dataset.baixar}]`, artes).toBlob(blob => {
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob); a.download = `divulgacao-${b.dataset.baixar}.png`; a.click();
+                setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+            }, "image/png");
+        });
+    }
+
     // ---------- Portaria ----------
     const portaria = $("#form-checkin");
     if (portaria) {

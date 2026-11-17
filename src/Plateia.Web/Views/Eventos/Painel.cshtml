@@ -65,6 +65,7 @@
 
     <section class="bloco b-pagto" style="--i:1">
         <h2>Pagamentos <a class="btn fantasma peq" href="/eventos/@e.Id/participantes?filtro=pendentes">Pendentes →</a></h2>
+        <span class="chip-cielo @(ViewBag.Online == true ? "" : "off")" style="margin-top:-10px">@(ViewBag.Online == true ? "Pagamento online pela Cielo ativo" : "Cielo não configurada: pagamento manual")</span>
         <div class="anel-linha">
             <div class="anel-num">
                 <div class="anel" style="--a:@Texto.N(Model.Pagos / (double)conf);--b:@Texto.N(Model.Pendentes / (double)conf);--c:@Texto.N(Model.Cortesias / (double)conf)"></div>

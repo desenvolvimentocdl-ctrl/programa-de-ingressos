@@ -12,51 +12,100 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Plateia.Web.Controllers;
 
-/// <summary>Páginas abertas ao público: página do evento, inscrição e ingresso.</summary>
+/// <summary>Páginas abertas ao público: agenda, página do evento, inscrição, pagamento e ingresso.</summary>
 [AllowAnonymous]
-public class PublicoController(AppDbContext db, InscricaoService inscricoes) : BaseController
+public class PublicoController(AppDbContext db, InscricaoService inscricoes, PagamentoService pagamentos, DivulgacaoService divulgacao,
+    ILogger<PublicoController> log) : BaseController
 {
+    [HttpGet("/agenda")]
+    public async Task<IActionResult> Agenda()
+    {
+        var limite = DateTime.UtcNow.AddHours(-6);
+        var eventos = await db.Eventos.Include(e => e.Tipos)
+            .Where(e => e.Status == StatusEvento.Publicado && (e.FimEm ?? e.InicioEm) >= limite)
+            .OrderBy(e => e.InicioEm)
+            .Select(e => new { e.Slug, e.Titulo, e.Subtitulo, e.Local, e.InicioEm, e.Cor, e.Tipos, e.InscricoesAbertas,
+                Livres = e.Capacidade - e.Inscricoes.Count(i => i.Status == StatusInscricao.Confirmada) })
+            .ToListAsync();
+        return View(eventos.Select(e => new CartaoAgenda(e.Slug, e.Titulo, e.Subtitulo, e.Local, e.InicioEm, e.Cor,
+            Texto.APartirDe(e.Tipos), e.Livres, e.InscricoesAbertas)).ToList());
+    }
+
     [HttpGet("/e/{slug}")]
-    public async Task<IActionResult> Evento(string slug)
+    public async Task<IActionResult> Evento(string slug, string? origem, [FromQuery(Name = "utm_source")] string? utm)
     {
         var pagina = await Montar(slug);
-        return pagina is null ? NotFound() : View(pagina);
+        if (pagina is null) return NotFound();
+        pagina.Canal = await RegistrarCanal(pagina, origem ?? utm);
+        return View(pagina);
+    }
+
+    [HttpGet("/e/{slug}/cupom")]
+    public async Task<IActionResult> Cupom(string slug, string? codigo)
+    {
+        var ev = await db.Eventos.FirstOrDefaultAsync(e => e.Slug == slug);
+        var c = ev is null ? null : await divulgacao.CupomValidoAsync(ev.Id, codigo);
+        return Json(c is null
+            ? new { valido = false, texto = "Cupom inválido ou esgotado.", tipo = "", valor = 0m }
+            : new { valido = true, texto = c.Tipo == TipoDesconto.Percentual ? $"{c.Valor:0.##}% de desconto aplicado" : $"{Hora.Dinheiro(c.Valor)} de desconto aplicado",
+                    tipo = c.Tipo.ToString(), valor = c.Valor });
     }
 
     [HttpPost("/e/{slug}"), EnableRateLimiting("publico")]
-    public async Task<IActionResult> Inscrever(string slug, int tipo, string nome, string email, string? telefone)
+    public async Task<IActionResult> Inscrever(string slug, int tipo, string nome, string email, string? telefone, string? cupom, string? canal)
     {
         var pagina = await Montar(slug);
         if (pagina is null) return NotFound();
         try
         {
-            var ins = await inscricoes.InscreverAsync(pagina.Evento.Id, tipo, nome, email, telefone, OrigemInscricao.Site);
+            var ins = await inscricoes.InscreverAsync(pagina.Evento.Id, tipo, nome, email, telefone, OrigemInscricao.Site, cupom: cupom, canal: canal);
             return Redirect($"/ingresso/{ins.Codigo}?novo=1");
         }
         catch (RegraNegocioException ex)
         {
             ViewBag.Erro = ex.Message;
-            ViewBag.Form = new { tipo, nome, email, telefone };
-            return View("Evento", await Montar(slug));
+            ViewBag.Form = new { tipo, nome, email, telefone, cupom };
+            var p = await Montar(slug);
+            p!.Canal = canal;
+            return View("Evento", p);
         }
     }
 
     [HttpGet("/ingresso/{codigo}")]
     public async Task<IActionResult> Ingresso(string codigo)
     {
-        var c = Utilidades.NormalizarCodigo(codigo);
-        var i = await db.Inscricoes.Include(x => x.Evento).Include(x => x.TipoIngresso).FirstOrDefaultAsync(x => x.Codigo == c);
+        var i = await Carregar(codigo);
         if (i is null) return NotFound();
+        // Quem volta da página da Cielo vê a situação atualizada (consulta limitada a uma vez por minuto).
+        if (i.Ativa && i.Pagamento == StatusPagamento.Pendente && i.CieloLinkId is not null)
+        {
+            try { await pagamentos.SincronizarAsync(i); }
+            catch (Exception ex) { log.LogWarning(ex, "Falha ao consultar a Cielo para o ingresso {Codigo}", i.Codigo); }
+        }
         ViewBag.Link = $"{Request.Scheme}://{Request.Host}/ingresso/{i.Codigo}";
+        ViewBag.Online = pagamentos.Online;
         return View(i);
     }
 
-    [HttpGet("/ingresso/{codigo}/agenda.ics")]
-    public async Task<IActionResult> Agenda(string codigo)
+    /// <summary>Leva para a página de pagamento da Cielo (o link é criado na primeira vez).</summary>
+    [HttpPost("/ingresso/{codigo}/pagar"), EnableRateLimiting("publico")]
+    public async Task<IActionResult> Pagar(string codigo)
     {
-        var c = Utilidades.NormalizarCodigo(codigo);
-        var i = await db.Inscricoes.Include(x => x.Evento).FirstOrDefaultAsync(x => x.Codigo == c && x.Status == StatusInscricao.Confirmada);
-        if (i?.Evento is not { } e) return NotFound();
+        var i = await Carregar(codigo);
+        if (i is null) return NotFound();
+        try { return Redirect(await pagamentos.UrlPagamentoAsync(i)); }
+        catch (HttpRequestException ex)
+        {
+            log.LogError(ex, "Cielo indisponível ao gerar link do ingresso {Codigo}", i.Codigo);
+            throw new RegraNegocioException("A Cielo não respondeu agora. Tente de novo em instantes.");
+        }
+    }
+
+    [HttpGet("/ingresso/{codigo}/agenda.ics")]
+    public async Task<IActionResult> Calendario(string codigo)
+    {
+        var i = await Carregar(codigo);
+        if (i is not { Ativa: true, Evento: { } e }) return NotFound();
         static string Esc(string? s) => (s ?? "").Replace("\\", "\\\\").Replace(";", "\\;").Replace(",", "\\,").Replace("\r", "").Replace("\n", "\\n");
         static string Ut(DateTime d) => d.ToString("yyyyMMdd'T'HHmmss'Z'");
         var ics = new StringBuilder()
@@ -66,6 +115,33 @@ public class PublicoController(AppDbContext db, InscricaoService inscricoes) : B
             .Append($"DESCRIPTION:{Esc($"Ingresso {i.Codigo}: {Request.Scheme}://{Request.Host}/ingresso/{i.Codigo}")}\r\n")
             .Append("END:VEVENT\r\nEND:VCALENDAR\r\n");
         return File(Encoding.UTF8.GetBytes(ics.ToString()), "text/calendar; charset=utf-8", $"{e.Slug}.ics");
+    }
+
+    Task<Inscricao?> Carregar(string codigo)
+    {
+        var c = Utilidades.NormalizarCodigo(codigo);
+        return db.Inscricoes.Include(x => x.Evento).Include(x => x.TipoIngresso).FirstOrDefaultAsync(x => x.Codigo == c);
+    }
+
+    /// <summary>
+    /// Guarda de qual canal a pessoa veio (link ?origem=instagram) por 30 dias e conta a visita
+    /// uma vez a cada 6 horas por navegador. Prévias de rascunho não contam.
+    /// </summary>
+    async Task<string?> RegistrarCanal(PaginaEvento p, string? origem)
+    {
+        var chaveCanal = $"pl_c{p.Evento.Id}";
+        var canal = DivulgacaoService.NormalizarCanal(origem) ?? DivulgacaoService.NormalizarCanal(Request.Cookies[chaveCanal]);
+        if (DivulgacaoService.NormalizarCanal(origem) is { } novo)
+            Response.Cookies.Append(chaveCanal, novo, new CookieOptions { MaxAge = TimeSpan.FromDays(30), HttpOnly = true, SameSite = SameSiteMode.Lax, IsEssential = true });
+
+        var chaveVisita = $"pl_v{p.Evento.Id}";
+        if (!p.Previa && Request.Cookies[chaveVisita] is null)
+        {
+            Response.Cookies.Append(chaveVisita, "1", new CookieOptions { MaxAge = TimeSpan.FromHours(6), HttpOnly = true, SameSite = SameSiteMode.Lax, IsEssential = true });
+            try { await divulgacao.RegistrarVisitaAsync(p.Evento.Id, canal, Hora.HojeLocal); }
+            catch (Exception ex) { log.LogWarning(ex, "Falha ao contar visita"); }
+        }
+        return canal;
     }
 
     async Task<PaginaEvento?> Montar(string slug)
@@ -84,6 +160,10 @@ public class PublicoController(AppDbContext db, InscricaoService inscricoes) : B
         }
 
         var resumo = await ResumoEvento.CarregarAsync(db, e);
-        return new PaginaEvento { Evento = e, Tipos = resumo.PorTipo.Where(t => t.Ativo).ToList(), Livres = resumo.Livres, Previa = previa };
+        return new PaginaEvento
+        {
+            Evento = e, Tipos = resumo.PorTipo.Where(t => t.Ativo).ToList(), Livres = resumo.Livres, Previa = previa,
+            PagamentoOnline = pagamentos.Online, TemCupons = await db.Cupons.AnyAsync(c => c.EventoId == e.Id && c.Ativo)
+        };
     }
 }

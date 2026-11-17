@@ -17,6 +17,8 @@ public static class Demo
         "Gustavo Ramos", "Beatriz Moura", "Rodrigo Lacerda", "Priscila Tavares", "Marcelo Viana", "Juliana Brito"
     ];
 
+    static readonly string?[] Canais = ["instagram", "instagram", "instagram", "whatsapp", "whatsapp", null, "linkedin", "cartaz"];
+
     public static async Task CriarAsync(AppDbContext db, IPasswordHasher<Usuario> hasher)
     {
         var org = new Usuario { Nome = "Marina Duarte", Email = "demo@plateia.local", Telefone = "34999990000", Perfil = Perfil.Organizador };
@@ -36,10 +38,12 @@ public static class Demo
             Organizador = org,
             Tipos =
             [
-                new TipoIngresso { Nome = "Inteira", Preco = 80, Ordem = 0 },
-                new TipoIngresso { Nome = "Meia / estudante", Descricao = "Apresente documento na entrada", Preco = 40, Ordem = 1 },
-                new TipoIngresso { Nome = "Convidado", Preco = 0, Quantidade = 10, Ordem = 2 }
-            ]
+                new TipoIngresso { Nome = "2º lote", Preco = 80, Ordem = 0 },
+                new TipoIngresso { Nome = "1º lote", Preco = 60, Ordem = 1, VendasAte = agora.AddDays(-2) },
+                new TipoIngresso { Nome = "Meia / estudante", Descricao = "Apresente documento na entrada", Preco = 40, Ordem = 2 },
+                new TipoIngresso { Nome = "Convidado", Preco = 0, Quantidade = 10, Ordem = 3 }
+            ],
+            Cupons = [new Cupom { Codigo = "PARCEIRO20", Tipo = TipoDesconto.Percentual, Valor = 20, Limite = 30 }]
         };
         var workshop = new Evento
         {
@@ -69,6 +73,7 @@ public static class Demo
                     EventoId = ev.Id, TipoIngressoId = tipo.Id, Nome = nome, Valor = tipo.Preco,
                     Email = Utilidades.Slug(nome).Replace("-", ".") + "@exemplo.com", Telefone = "3499" + rnd.Next(1000000, 9999999),
                     Codigo = Utilidades.NovoCodigo(), CriadoEm = criado, Origem = rnd.Next(10) < 8 ? OrigemInscricao.Site : OrigemInscricao.Manual,
+                    Canal = Canais[rnd.Next(Canais.Length)],
                     Pagamento = tipo.Gratuito ? StatusPagamento.Cortesia : rnd.Next(10) < 7 ? StatusPagamento.Pago : StatusPagamento.Pendente
                 };
                 if (ins.Pagamento == StatusPagamento.Pago) { ins.PagoEm = criado.AddMinutes(rnd.Next(10, 600)); if (ins.PagoEm > agora) ins.PagoEm = agora.AddMinutes(-2); ins.FormaPagamento = "PIX"; }
@@ -80,6 +85,9 @@ public static class Demo
         }
         Inscrever(palestra, 78, false);
         Inscrever(passado, 33, true);
+        foreach (var (canal, total) in new[] { ("instagram", 420), ("whatsapp", 230), ("direto", 160), ("linkedin", 70), ("cartaz", 38) })
+            for (var d = 0; d < 7; d++)
+                db.Visitas.Add(new VisitaEvento { EventoId = palestra.Id, Canal = canal, Dia = DateTime.Today.AddDays(-d), Visitas = total / 7 + rnd.Next(0, 5) });
         await db.SaveChangesAsync();
     }
 }

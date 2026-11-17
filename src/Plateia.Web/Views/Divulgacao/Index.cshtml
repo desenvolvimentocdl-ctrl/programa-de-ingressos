@@ -1,0 +1,148 @@
+@model PaginaDivulgacao
+@{
+    var e = Model.Evento;
+    ViewData["Title"] = "Divulgação · " + e.Titulo;
+    ViewData["Aba"] = "divulgacao";
+    string Link(string canal) => $"{Model.LinkBase}?origem={canal}";
+    var preco = Model.MenorPreco <= 0 ? "Gratuito" : "A partir de " + Hora.Dinheiro(Model.MenorPreco);
+    var mensagem = $"🎟️ {e.Titulo}" + (e.Subtitulo is { } s ? $"\n{s}" : "") +
+                   $"\n\n📅 {Hora.DataLonga(e.InicioEm)}\n📍 {e.Local}" + (e.Endereco is { } end ? $" · {end}" : "") +
+                   $"\n💳 {preco}\n\nGaranta seu lugar: {Link("whatsapp")}";
+    var tinta = Texto.TintaSobre(e.Cor);
+    var maxVisitas = Math.Max(1, Model.Funil.Select(f => f.Visitas).DefaultIfEmpty(0).Max());
+    var totalVisitas = Model.Funil.Sum(f => f.Visitas);
+}
+<partial name="_CabecaEvento" model="e" />
+
+@if (e.Status == StatusEvento.Rascunho)
+{
+    <div class="alerta-caixa" style="margin-bottom:16px">Este evento está em <b>rascunho</b>: os links só funcionam para você. <a href="/eventos/@e.Id/editar" style="color:inherit">Publique</a> antes de divulgar.</div>
+}
+
+<div class="kit">
+    <section class="bloco k-links" style="--i:0">
+        <h2>Links por canal <span class="suave" style="text-transform:none;letter-spacing:0;font-weight:500">cada link mostra de onde veio cada inscrição</span></h2>
+        <div class="canais">
+            @foreach (var (chave, nome) in DivulgacaoService.Canais)
+            {
+                <div class="canal">
+                    <b>@nome</b>
+                    <code>@Link(chave)</code>
+                    <button class="btn peq" type="button" data-copiar="@Link(chave)" data-aviso="Link para @nome copiado.">Copiar</button>
+                </div>
+            }
+            <form class="canal" id="canal-livre" data-base="@Model.LinkBase">
+                <input name="canal" placeholder="Outro canal (ex.: parceiro-x)" maxlength="40" aria-label="Nome de outro canal" style="height:34px">
+                <code data-saida>@Model.LinkBase?origem=…</code>
+                <button class="btn peq" type="submit">Copiar</button>
+            </form>
+        </div>
+        <h2 style="margin-top:6px">Compartilhar agora</h2>
+        <div class="compartilhar">
+            <a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=@Uri.EscapeDataString(mensagem)">WhatsApp</a>
+            <a class="btn" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=@Uri.EscapeDataString(Link("facebook"))">Facebook</a>
+            <a class="btn" target="_blank" rel="noopener" href="https://www.linkedin.com/sharing/share-offsite/?url=@Uri.EscapeDataString(Link("linkedin"))">LinkedIn</a>
+            <a class="btn" href="mailto:?subject=@Uri.EscapeDataString(e.Titulo)&body=@Uri.EscapeDataString(mensagem.Replace("origem=whatsapp", "origem=email"))">E-mail</a>
+        </div>
+        <label class="campo">Mensagem pronta <small>edite à vontade antes de copiar</small>
+            <textarea class="mensagem-pronta" id="mensagem-pronta">@mensagem</textarea>
+        </label>
+        <button class="btn" type="button" data-copiar-de="#mensagem-pronta" style="justify-self:start">Copiar mensagem</button>
+    </section>
+
+    <section class="bloco k-funil" style="--i:1">
+        <h2>Resultado por canal</h2>
+        <div class="numeros">
+            <div><b data-contar="@totalVisitas">@totalVisitas</b><span>visitas na página</span></div>
+            <div><b data-contar="@Model.Funil.Sum(f => f.Inscricoes)">@Model.Funil.Sum(f => f.Inscricoes)</b><span>inscrições pelo site</span></div>
+            <div><b>@(totalVisitas == 0 ? "—" : $"{Math.Min(100, Model.Funil.Sum(f => f.Inscricoes) * 100.0 / totalVisitas):0}%")</b><span>conversão</span></div>
+        </div>
+        @if (Model.Funil.Count == 0)
+        {
+            <p class="vazio">Ainda sem visitas. Use os links ao lado: cada canal aparece aqui com visitas, inscrições e pagamentos.</p>
+        }
+        else
+        {
+            <table class="funil-tabela">
+                <thead><tr><th>Canal</th><th class="n">Visitas</th><th class="n">Inscr.</th><th class="n">Pagos</th></tr></thead>
+                <tbody>
+                    @foreach (var f in Model.Funil)
+                    {
+                        <tr>
+                            <td>@DivulgacaoService.NomeCanal(f.Canal)<div class="mini-barra"><i style="--v:@Texto.N(f.Visitas / (double)maxVisitas)"></i></div></td>
+                            <td class="n">@f.Visitas</td>
+                            <td class="n">@f.Inscricoes</td>
+                            <td class="n">@f.Pagos</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <p class="suave" style="font-size:12px">Visitas contam uma vez a cada 6 h por pessoa. Inscrições feitas pela equipe não entram aqui.</p>
+        }
+    </section>
+
+    <section class="bloco k-arte" style="--i:2">
+        <h2>Artes prontas <span class="suave" style="text-transform:none;letter-spacing:0;font-weight:500">geradas com a cor e o nome do evento</span></h2>
+        <div class="artes" data-arte
+             data-titulo="@e.Titulo" data-sub="@e.Subtitulo" data-data="@Hora.DataLonga(e.InicioEm)" data-local="@e.Local"
+             data-cor="@e.Cor" data-tinta="@tinta" data-preco="@preco" data-numero="Nº @Texto.Numero(e.Id)"
+             data-link="@Model.LinkBase.Replace("https://", "").Replace("http://", "")" data-qr="/eventos/@e.Id/qr.svg?canal=instagram">
+            <figure>
+                <canvas width="1080" height="1920" data-formato="stories" aria-label="Arte para stories"></canvas>
+                <figcaption><span>Stories · 1080×1920</span><button class="btn peq" type="button" data-baixar="stories">Baixar PNG</button></figcaption>
+            </figure>
+            <figure>
+                <canvas width="1080" height="1350" data-formato="feed" aria-label="Arte para o feed"></canvas>
+                <figcaption><span>Feed · 1080×1350</span><button class="btn peq" type="button" data-baixar="feed">Baixar PNG</button></figcaption>
+            </figure>
+        </div>
+    </section>
+
+    <section class="bloco k-qr" style="--i:3">
+        <h2>QR code para cartaz</h2>
+        <div class="qr-caixa">@Html.Raw(Qr.Svg(Link("cartaz")))</div>
+        <p class="suave" style="font-size:14px;text-align:center">Aponta para a página do evento e conta como canal <b>Cartaz</b>. Use em banners, mesas e telões.</p>
+        <a class="btn" href="/eventos/@e.Id/qr.svg?canal=cartaz" download style="justify-self:center">Baixar QR (SVG, para gráfica)</a>
+    </section>
+
+    <section class="bloco k-cupons" style="--i:4">
+        <h2>Cupons de desconto <span class="suave" style="text-transform:none;letter-spacing:0;font-weight:500">para parceiros, equipe ou campanhas</span></h2>
+        <form class="form-cupom" method="post" asp-antiforgery="true" action="/eventos/@e.Id/cupons">
+            <label class="campo">Código<input name="codigo" required maxlength="30" placeholder="PARCEIRO20" style="text-transform:uppercase"></label>
+            <label class="campo">Tipo
+                <select name="tipo"><option value="Percentual">% do valor</option><option value="Valor">R$ fixo</option></select>
+            </label>
+            <label class="campo">Desconto<input name="valor" required inputmode="decimal" placeholder="20"></label>
+            <label class="campo">Limite <small>usos</small><input type="number" name="limite" min="1" placeholder="—"></label>
+            <label class="campo">Válido até <small>opcional</small><input type="datetime-local" name="validoAte"></label>
+            <button class="btn pri">Criar cupom</button>
+        </form>
+        @if (Model.Cupons.Count > 0)
+        {
+            <div class="rolagem"><table class="tabela simples" style="margin-top:6px">
+                <thead><tr><th>Cupom</th><th>Desconto</th><th>Usos</th><th class="oculta-m">Validade</th><th>Situação</th><th class="col-acoes"><span class="sr">Ações</span></th></tr></thead>
+                <tbody>
+                    @foreach (var u in Model.Cupons)
+                    {
+                        var c = u.Cupom;
+                        var vencido = c.ValidoAte is { } va && va < DateTime.UtcNow;
+                        <tr class="@(c.Ativo ? "" : "cancelada")">
+                            <td><span class="codigo-cupom">@c.Codigo</span></td>
+                            <td>@(c.Tipo == TipoDesconto.Percentual ? $"{c.Valor:0.##}%" : Hora.Dinheiro(c.Valor))</td>
+                            <td class="mono">@u.Usos@(c.Limite is { } l ? $"/{l}" : "")<span class="forma">@Hora.Dinheiro(u.DescontoTotal) em descontos</span></td>
+                            <td class="oculta-m">@(c.ValidoAte is { } v ? Hora.Local(v).ToString("dd/MM/yyyy HH:mm") : "—")</td>
+                            <td><span class="pilula @(c.Ativo && !vencido ? "ok" : "")">@(!c.Ativo ? "Desativado" : vencido ? "Vencido" : "Ativo")</span></td>
+                            <td class="col-acoes">
+                                <form method="post" asp-antiforgery="true" action="/eventos/@e.Id/cupons/@c.Id/ativo" style="display:inline-flex;gap:6px">
+                                    <input type="hidden" name="ativo" value="@(c.Ativo ? "false" : "true")">
+                                    <button class="btn peq" type="button" data-copiar="@Link("cupom")" data-aviso="Link copiado. Mande junto com o código @c.Codigo.">Link</button>
+                                    <button class="btn peq @(c.Ativo ? "perigo" : "")">@(c.Ativo ? "Desativar" : "Reativar")</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+        }
+    </section>
+</div>

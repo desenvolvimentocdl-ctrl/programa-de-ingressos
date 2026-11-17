@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Plateia.Web.Controllers;
 
-public class ParticipantesController(AppDbContext db, EventoService eventos, InscricaoService inscricoes) : BaseController
+public class ParticipantesController(AppDbContext db, EventoService eventos, InscricaoService inscricoes, PagamentoService pagamentos) : BaseController
 {
     public static readonly string[] Filtros = ["todos", "pagos", "pendentes", "cortesia", "presentes", "cancelados"];
 
@@ -20,7 +20,7 @@ public class ParticipantesController(AppDbContext db, EventoService eventos, Ins
         if (e is null) return NotFound();
         filtro = Filtros.Contains(filtro) ? filtro! : "todos";
 
-        var consulta = db.Inscricoes.Include(i => i.TipoIngresso).Where(i => i.EventoId == id);
+        var consulta = db.Inscricoes.Include(i => i.TipoIngresso).Include(i => i.Cupom).Where(i => i.EventoId == id);
         consulta = filtro switch
         {
             "pagos" => consulta.Where(i => i.Status == StatusInscricao.Confirmada && i.Pagamento == StatusPagamento.Pago),
@@ -37,6 +37,7 @@ public class ParticipantesController(AppDbContext db, EventoService eventos, Ins
             consulta = consulta.Where(i => i.Nome.Contains(t) || i.Email.Contains(t) || (i.Telefone != null && i.Telefone.Contains(t)) || i.Codigo == cod);
         }
 
+        ViewBag.Online = pagamentos.Online;
         return View(new ListaParticipantes
         {
             Resumo = await ResumoEvento.CarregarAsync(db, e),
@@ -83,6 +84,23 @@ public class ParticipantesController(AppDbContext db, EventoService eventos, Ins
         return VoltarCom($"Inscrição de {i.Nome} cancelada. O lugar voltou a ficar livre.");
     }
 
+    /// <summary>Consulta a Cielo para os pendentes que já abriram o link de pagamento (caso algum aviso não tenha chegado).</summary>
+    [HttpPost("/eventos/{id:int}/cielo/atualizar")]
+    public async Task<IActionResult> AtualizarCielo(int id)
+    {
+        if (await eventos.ObterAsync(id, Eu) is null) return NotFound();
+        if (!pagamentos.Online) return VoltarCom("O pagamento online (Cielo) ainda não foi configurado.");
+        var pendentes = await db.Inscricoes.Where(i => i.EventoId == id && i.Status == StatusInscricao.Confirmada
+            && i.Pagamento == StatusPagamento.Pendente && i.CieloLinkId != null).ToListAsync();
+        int pagos = 0, falhas = 0;
+        foreach (var i in pendentes)
+        {
+            try { if (await pagamentos.SincronizarAsync(i, forcar: true) && i.Pagamento == StatusPagamento.Pago) pagos++; }
+            catch { falhas++; }
+        }
+        return VoltarCom($"{pendentes.Count} pendente(s) consultado(s) na Cielo: {pagos} pagamento(s) novo(s)." + (falhas > 0 ? $" {falhas} consulta(s) falharam; tente de novo." : ""));
+    }
+
     [HttpPost("/eventos/{id:int}/participantes/lote")]
     public async Task<IActionResult> Lote(int id, string acao, int[] ids)
     {
@@ -108,7 +126,7 @@ public class ParticipantesController(AppDbContext db, EventoService eventos, Ins
     {
         var e = await eventos.ObterAsync(id, Eu);
         if (e is null) return NotFound();
-        var itens = await db.Inscricoes.Include(i => i.TipoIngresso).Where(i => i.EventoId == id).OrderBy(i => i.Nome).ToListAsync();
+        var itens = await db.Inscricoes.Include(i => i.TipoIngresso).Include(i => i.Cupom).Where(i => i.EventoId == id).OrderBy(i => i.Nome).ToListAsync();
 
         static string C(string? v)
         {
@@ -116,13 +134,14 @@ public class ParticipantesController(AppDbContext db, EventoService eventos, Ins
             if (v.Length > 0 && "=+-@\t\r".Contains(v[0])) v = "'" + v; // evita fórmulas ao abrir no Excel
             return v.Contains(';') || v.Contains('"') || v.Contains('\n') ? "\"" + v.Replace("\"", "\"\"") + "\"" : v;
         }
-        var sb = new StringBuilder("Nome;E-mail;Telefone;Ingresso;Valor;Pagamento;Forma;Pago em;Check-in;Situação;Código;Inscrito em\n");
+        var sb = new StringBuilder("Nome;E-mail;Telefone;Ingresso;Valor;Desconto;Cupom;Pagamento;Forma;Pago em;Pedido Cielo;Check-in;Situação;Canal;Código;Inscrito em\n");
         foreach (var i in itens)
             sb.AppendJoin(';', C(i.Nome), C(i.Email), C(i.Telefone), C(i.TipoIngresso?.Nome), i.Valor.ToString("0.00", Hora.PtBr),
+                i.Desconto.ToString("0.00", Hora.PtBr), C(i.Cupom?.Codigo),
                 Texto.NomePagamento(i.Pagamento), C(i.FormaPagamento),
-                i.PagoEm is { } p ? Hora.Local(p).ToString("dd/MM/yyyy HH:mm") : "",
+                i.PagoEm is { } p ? Hora.Local(p).ToString("dd/MM/yyyy HH:mm") : "", C(i.CieloPedido),
                 i.CheckinEm is { } c ? Hora.Local(c).ToString("dd/MM/yyyy HH:mm") : "",
-                i.Ativa ? "Confirmada" : "Cancelada", i.Codigo, Hora.Local(i.CriadoEm).ToString("dd/MM/yyyy HH:mm")).Append('\n');
+                i.Ativa ? "Confirmada" : "Cancelada", C(DivulgacaoService.NomeCanal(i.Canal)), i.Codigo, Hora.Local(i.CriadoEm).ToString("dd/MM/yyyy HH:mm")).Append('\n');
 
         var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
         return File(bytes, "text/csv; charset=utf-8", $"participantes-{e.Slug}.csv");

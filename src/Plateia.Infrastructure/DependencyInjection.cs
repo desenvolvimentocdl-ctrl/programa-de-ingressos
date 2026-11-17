@@ -1,4 +1,5 @@
 using Plateia.Application;
+using Plateia.Infrastructure.Cielo;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,8 +19,13 @@ public static class DependencyInjection
             m => m.EnableRetryOnFailure(3)));
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
+        services.Configure<CieloOptions>(config.GetSection("Cielo"));
+        services.AddHttpClient<IPagamentoOnline, CieloLinkPagamento>(c => c.Timeout = TimeSpan.FromSeconds(30));
+
         services.AddScoped<EventoService>();
         services.AddScoped<InscricaoService>();
+        services.AddScoped<PagamentoService>();
+        services.AddScoped<DivulgacaoService>();
         return services;
     }
 }

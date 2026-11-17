@@ -1,0 +1,38 @@
+@model List<CartaoAgenda>
+@{
+    Layout = "_LayoutPublico";
+    ViewData["Title"] = "Agenda de eventos";
+    ViewData["Descricao"] = "Palestras, workshops e encontros com inscrições abertas.";
+    ViewData["Cor"] = "#FF6B4A";
+    ViewData["LinkMarca"] = "/agenda";
+    var n = 0;
+}
+<main class="agenda">
+    <div>
+        <h1 class="display">Agenda</h1>
+        <p class="suave" style="font-size:18px;margin-top:10px">Palestras, workshops e encontros. Escolha, inscreva-se e receba o ingresso na hora.</p>
+    </div>
+    @if (Model.Count == 0)
+    {
+        <div class="bilhete" style="padding:40px;text-align:center"><b class="display" style="font-size:32px">Nenhum evento agora</b><p class="suave" style="margin-top:8px">Volte em breve.</p></div>
+    }
+    else
+    {
+        <div class="lista-agenda">
+            @foreach (var e in Model)
+            {
+                <a class="bilhete cartao-agenda" href="/e/@e.Slug?origem=agenda" style="--i:@(n++)">
+                    <div class="cartaz" style="--cor:@e.Cor;--tinta:@Texto.TintaSobre(e.Cor)">
+                        <div style="display:flex;justify-content:space-between;font:600 13px var(--mono)"><span>@Hora.Data(e.InicioEm)</span><span>@(e.Livres <= 0 ? "LOTADO" : !e.Abertas ? "FECHADO" : "")</span></div>
+                        <h2 class="display">@e.Titulo</h2>
+                    </div>
+                    <div class="picote"></div>
+                    <div class="corpo">
+                        <span>@e.Local</span>
+                        <b>@(e.MenorPreco <= 0 ? "Gratuito" : "a partir de " + Hora.Dinheiro(e.MenorPreco))</b>
+                    </div>
+                </a>
+            }
+        </div>
+    }
+</main>

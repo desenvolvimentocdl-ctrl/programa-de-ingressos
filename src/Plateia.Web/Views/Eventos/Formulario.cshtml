@@ -37,7 +37,7 @@
 
         <section class="secao">
             <h2>Ingressos</h2>
-            <p>Preço zero = gratuito (entra como cortesia). Deixe a quantidade em branco para usar só a capacidade do evento.</p>
+            <p>Preço zero = gratuito (entra como cortesia). Quantidade em branco = só a capacidade do evento. Para lotes, crie um tipo por lote ("1º lote", "2º lote") com a data em que as vendas acabam.</p>
             <div id="tipos" style="display:grid;gap:10px">
                 @foreach (var t in Model.Tipos)
                 {
@@ -49,11 +49,12 @@
                         <label class="campo">Quantidade<input type="number" name="tipo_qtd" value="@t.Quantidade" min="1" inputmode="numeric" placeholder="—"></label>
                         <button type="button" class="btn fantasma ico" data-remover-tipo title="Remover" aria-label="Remover tipo de ingresso" style="margin-bottom:4px">×</button>
                         <label class="campo desc">Detalhe <small>opcional</small><input name="tipo_desc" value="@t.Descricao" maxlength="300" placeholder="Ex.: válido para estudantes com carteirinha"></label>
+                        <label class="campo ate">Vendas até <small>opcional · para lotes</small><input type="datetime-local" name="tipo_ate" value="@Hora.Input(t.VendasAte)"></label>
                     </div>
                 }
             </div>
             <button type="button" class="btn" id="add-tipo" style="justify-self:start"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Outro tipo de ingresso</button>
-            <label class="campo">Como pagar <small>aparece no ingresso enquanto o pagamento está pendente (chave PIX, conta, contato para comprovante)</small>
+            <label class="campo">Outras formas de pagar <small>opcional · aparece no ingresso junto do botão de pagamento da Cielo (ex.: pagar na secretaria)</small>
                 <textarea name="instrucoes" rows="3" maxlength="2000" placeholder="PIX: seuemail@exemplo.com · envie o comprovante para (34) 9…">@Model.InstrucoesPagamento</textarea>
             </label>
         </section>
@@ -105,5 +106,6 @@
         <label class="campo">Quantidade<input type="number" name="tipo_qtd" min="1" inputmode="numeric" placeholder="—"></label>
         <button type="button" class="btn fantasma ico" data-remover-tipo title="Remover" aria-label="Remover tipo de ingresso" style="margin-bottom:4px">×</button>
         <label class="campo desc">Detalhe <small>opcional</small><input name="tipo_desc" maxlength="300"></label>
+        <label class="campo ate">Vendas até <small>opcional · para lotes</small><input type="datetime-local" name="tipo_ate"></label>
     </div>
 </template>

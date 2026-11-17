@@ -22,6 +22,49 @@ namespace Plateia.Infrastructure.Migrations
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
+            modelBuilder.Entity("Plateia.Domain.Cupom", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("EventoId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("Limite")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Tipo")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ValidoAte")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("Valor")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventoId", "Codigo")
+                        .IsUnique();
+
+                    b.ToTable("Cupons");
+                });
+
             modelBuilder.Entity("Plateia.Domain.Evento", b =>
                 {
                     b.Property<int>("Id")
@@ -105,11 +148,30 @@ namespace Plateia.Infrastructure.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Canal")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
                     b.Property<DateTime?>("CanceladaEm")
                         .HasColumnType("datetime(6)");
 
                     b.Property<DateTime?>("CheckinEm")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("CieloConsultadoEm")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CieloLinkId")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("CieloLinkUrl")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<string>("CieloPedido")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
 
                     b.Property<string>("Codigo")
                         .IsRequired()
@@ -118,6 +180,13 @@ namespace Plateia.Infrastructure.Migrations
 
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("CupomId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Desconto")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -165,8 +234,14 @@ namespace Plateia.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CieloLinkId");
+
+                    b.HasIndex("CieloPedido");
+
                     b.HasIndex("Codigo")
                         .IsUnique();
+
+                    b.HasIndex("CupomId");
 
                     b.HasIndex("TipoIngressoId");
 
@@ -209,6 +284,9 @@ namespace Plateia.Infrastructure.Migrations
 
                     b.Property<int?>("Quantidade")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("VendasAte")
+                        .HasColumnType("datetime(6)");
 
                     b.HasKey("Id");
 
@@ -261,6 +339,47 @@ namespace Plateia.Infrastructure.Migrations
                     b.ToTable("Usuarios");
                 });
 
+            modelBuilder.Entity("Plateia.Domain.VisitaEvento", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Canal")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<DateTime>("Dia")
+                        .HasColumnType("date");
+
+                    b.Property<int>("EventoId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Visitas")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventoId", "Canal", "Dia")
+                        .IsUnique();
+
+                    b.ToTable("Visitas", (string)null);
+                });
+
+            modelBuilder.Entity("Plateia.Domain.Cupom", b =>
+                {
+                    b.HasOne("Plateia.Domain.Evento", "Evento")
+                        .WithMany("Cupons")
+                        .HasForeignKey("EventoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Evento");
+                });
+
             modelBuilder.Entity("Plateia.Domain.Evento", b =>
                 {
                     b.HasOne("Plateia.Domain.Usuario", "Organizador")
@@ -274,6 +393,11 @@ namespace Plateia.Infrastructure.Migrations
 
             modelBuilder.Entity("Plateia.Domain.Inscricao", b =>
                 {
+                    b.HasOne("Plateia.Domain.Cupom", "Cupom")
+                        .WithMany()
+                        .HasForeignKey("CupomId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Plateia.Domain.Evento", "Evento")
                         .WithMany("Inscricoes")
                         .HasForeignKey("EventoId")
@@ -285,6 +409,8 @@ namespace Plateia.Infrastructure.Migrations
                         .HasForeignKey("TipoIngressoId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Cupom");
 
                     b.Navigation("Evento");
 
@@ -302,8 +428,19 @@ namespace Plateia.Infrastructure.Migrations
                     b.Navigation("Evento");
                 });
 
+            modelBuilder.Entity("Plateia.Domain.VisitaEvento", b =>
+                {
+                    b.HasOne("Plateia.Domain.Evento", null)
+                        .WithMany()
+                        .HasForeignKey("EventoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Plateia.Domain.Evento", b =>
                 {
+                    b.Navigation("Cupons");
+
                     b.Navigation("Inscricoes");
 
                     b.Navigation("Tipos");

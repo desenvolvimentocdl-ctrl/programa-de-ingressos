@@ -6,11 +6,19 @@
 <div class="cabeca">
     <div>
         <h1>@(admin ? "Eventos" : "Meus eventos")</h1>
-        <p>@(Model.Count == 0 ? "Nenhum evento ainda." : $"{Model.Count} evento(s) · {Model.Sum(e => e.Confirmados)} pessoas confirmadas")</p>
+        <p>@(Model.Count == 0 ? "Nenhum evento nesta lista." : $"{Model.Count} evento(s) · {Model.Sum(e => e.Confirmados)} pessoas confirmadas")</p>
     </div>
     <a class="btn pri" href="/eventos/novo"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Novo evento</a>
 </div>
 
+@{ var contagem = (Dictionary<string, int>)ViewBag.Contagem; var ver = (string)ViewBag.Ver; }
+<nav class="filtros" style="margin:-8px 0 22px" aria-label="Filtrar eventos">
+    @foreach (var (chave, nome) in Plateia.Web.Controllers.EventosController.Visoes)
+    {
+        <a href="/?ver=@chave" class="@(ver == chave ? "on" : "")">@nome <b>@contagem[chave]</b></a>
+    }
+    <a href="/agenda" target="_blank" rel="noopener" style="margin-left:auto">Agenda pública ↗</a>
+</nav>
 <div class="eventos">
     @{ var n = 0; }
     @foreach (var e in Model)

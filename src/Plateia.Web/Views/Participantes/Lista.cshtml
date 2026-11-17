@@ -26,6 +26,10 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
             <input type="search" name="q" value="@Model.Busca" placeholder="Nome, e-mail, telefone ou código" aria-label="Buscar participante">
         </form>
+        @if (ViewBag.Online == true && r.Pendentes > 0)
+        {
+            <form method="post" asp-antiforgery="true" action="/eventos/@e.Id/cielo/atualizar"><button class="btn" title="Consulta a Cielo para os pendentes que já abriram o link de pagamento">Atualizar Cielo</button></form>
+        }
         <a class="btn" href="/eventos/@e.Id/exportar">Exportar planilha</a>
         <button class="btn pri" type="button" data-abrir="#dlg-novo"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Adicionar</button>
     </div>
@@ -65,11 +69,13 @@ else
                             <div style="min-width:0"><b>@i.Nome</b><small>@i.Email@(i.Telefone is { } t ? $" · {t}" : "")</small></div>
                         </div>
                     </td>
-                    <td class="oculta-m"><span>@i.TipoIngresso?.Nome</span><br><small class="suave mono">@i.Codigo</small></td>
+                    <td class="oculta-m"><span>@i.TipoIngresso?.Nome</span>@if (i.Cupom is { } cp) { <span class="etiqueta" title="Cupom: @Hora.Dinheiro(i.Desconto) de desconto">@cp.Codigo</span> }<br><small class="suave mono">@i.Codigo</small>@if (i.Canal is { } canal) { <small class="suave"> · via @DivulgacaoService.NomeCanal(canal)</small> }</td>
                     <td>
                         @if (i.Ativa)
                         {
                             <span class="pilula @Texto.ClassePagamento(i.Pagamento)">@Texto.NomePagamento(i.Pagamento)@(i.Pagamento == StatusPagamento.Pendente && i.Valor > 0 ? $" · {Hora.Dinheiro(i.Valor)}" : "")</span>
+                            @if (i.Pagamento == StatusPagamento.Pago) { <span class="forma">@Hora.Dinheiro(i.Valor)@(i.FormaPagamento is { } fp ? $" · {fp}" : "")</span> }
+                            else if (i.Pagamento == StatusPagamento.Pendente && i.CieloLinkId is not null) { <span class="forma">abriu o pagamento na Cielo</span> }
                         }
                         else
                         {
@@ -111,7 +117,9 @@ else
                                     <hr>
                                     @if (i.Pagamento == StatusPagamento.Pendente && i.Telefone is { } fone)
                                     {
-                                        var msg = $"Olá, {Texto.PrimeiroNome(i.Nome)}! Sua inscrição em \"{e.Titulo}\" está confirmada, falta só o pagamento de {Hora.Dinheiro(i.Valor)}.\n\n{e.InstrucoesPagamento}\n\nSeu ingresso: {linkIngresso}";
+                                        var msg = ViewBag.Online == true
+                                            ? $"Olá, {Texto.PrimeiroNome(i.Nome)}! Sua inscrição em \"{e.Titulo}\" está reservada, falta só o pagamento de {Hora.Dinheiro(i.Valor)}. É só abrir o seu ingresso e tocar em \"Pagar com a Cielo\" (cartão ou Pix): {linkIngresso}"
+                                            : $"Olá, {Texto.PrimeiroNome(i.Nome)}! Sua inscrição em \"{e.Titulo}\" está confirmada, falta só o pagamento de {Hora.Dinheiro(i.Valor)}.\n\n{e.InstrucoesPagamento}\n\nSeu ingresso: {linkIngresso}";
                                         <a href="@Texto.LinkWhatsApp(fone, msg)" target="_blank" rel="noopener">Cobrar no WhatsApp</a>
                                     }
                                     else if (i.Telefone is { } fone2)

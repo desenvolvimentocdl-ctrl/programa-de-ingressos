@@ -151,6 +151,13 @@ public static class Texto
         return $"https://wa.me/{d}?text={Uri.EscapeDataString(mensagem)}";
     }
 
+    /// <summary>Menor preço pago à venda (ignora cortesias e lotes encerrados); 0 quando o evento é todo gratuito.</summary>
+    public static decimal APartirDe(IEnumerable<TipoIngresso> tipos)
+    {
+        var aVenda = tipos.Where(t => t.Ativo && !t.VendaEncerrada(DateTime.UtcNow) && t.Preco > 0).Select(t => t.Preco).ToList();
+        return aVenda.Count == 0 ? 0 : aVenda.Min();
+    }
+
     /// <summary>Número para CSS (sempre com ponto, independente da cultura do servidor).</summary>
     public static string N(double v) => v.ToString("0.####", CultureInfo.InvariantCulture);
 

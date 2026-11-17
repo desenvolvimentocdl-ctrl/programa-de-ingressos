@@ -10,7 +10,11 @@ public enum TipoAcontecimento { Inscreveu, Pagou, Entrou, Cancelou }
 
 public record Acontecimento(DateTime Quando, TipoAcontecimento Tipo, string Nome);
 
-public record ResumoTipo(int Id, string Nome, decimal Preco, int? Quantidade, int Vendidos, bool Ativo);
+public record ResumoTipo(int Id, string Nome, decimal Preco, int? Quantidade, int Vendidos, bool Ativo, DateTime? VendasAte = null, string? Descricao = null)
+{
+    public bool Esgotado => Quantidade is { } q && Vendidos >= q;
+    public bool Encerrado => VendasAte is { } v && DateTime.UtcNow > v;
+}
 
 /// <summary>Números do painel de um evento. Eventos têm no máximo alguns milhares de inscrições, então tudo é calculado em memória.</summary>
 public class ResumoEvento
@@ -32,7 +36,7 @@ public class ResumoEvento
     public double Ocupacao => Evento.Capacidade == 0 ? 0 : Math.Min(1, (double)Confirmados / Evento.Capacidade);
 
     public List<ResumoTipo> PorTipo => Evento.Tipos.OrderBy(t => t.Ordem)
-        .Select(t => new ResumoTipo(t.Id, t.Nome, t.Preco, t.Quantidade, Ativas.Count(l => l.TipoId == t.Id), t.Ativo))
+        .Select(t => new ResumoTipo(t.Id, t.Nome, t.Preco, t.Quantidade, Ativas.Count(l => l.TipoId == t.Id), t.Ativo, t.VendasAte, t.Descricao))
         .Where(t => t.Ativo || t.Vendidos > 0).ToList();
 
     /// <summary>Inscrições por dia (datas locais), dos últimos <paramref name="dias"/> dias.</summary>

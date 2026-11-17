@@ -585,3 +585,92 @@ body.publico .botoes-ingresso .btn { --c: var(--sup); }
     .ingresso { box-shadow: none; border: 1px solid #ccc; -webkit-mask: none; mask: none; }
     * { animation: none !important; }
 }
+
+/* ---------- Vendas, gerenciamento e divulgação ---------- */
+.tipo-linha .desc { grid-column: 1 / 3; }
+.tipo-linha .ate { grid-column: 3 / -1; }
+.cabeca-evento .menu .btn { --c: rgb(0 0 0 / .18); --t: var(--tinta); }
+.cabeca-evento .menu-itens { color: var(--texto); }
+.forma { display: block; margin-top: 4px; font-size: 12px; color: var(--suave); }
+.etiqueta { display: inline-block; font: 600 11px var(--mono); padding: 1px 6px; border-radius: 5px; background: var(--sup-3); color: var(--suave); margin-left: 4px; vertical-align: 1px; }
+.chip-cielo { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--suave); }
+.chip-cielo::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.chip-cielo.off::before { background: var(--apagado); }
+
+/* Divulgação */
+.kit { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+.k-links { grid-column: span 7; } .k-funil { grid-column: span 5; } .k-arte { grid-column: span 7; } .k-qr { grid-column: span 5; } .k-cupons { grid-column: span 12; }
+.canais { display: grid; gap: 8px; }
+.canal { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 8px 8px 14px; border-radius: 12px; background: var(--sup-2); }
+.canal b { font-size: 14px; }
+.canal code { font: 500 12px var(--mono); color: var(--suave); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compartilhar { display: flex; gap: 8px; flex-wrap: wrap; }
+.mensagem-pronta { min-height: 150px; font-size: 14px; }
+.funil-tabela { width: 100%; border-collapse: collapse; font-size: 14px; }
+.funil-tabela th { text-align: left; font-size: 11px; color: var(--suave); text-transform: uppercase; letter-spacing: .06em; padding: 0 0 8px; font-weight: 600; }
+.funil-tabela td { padding: 9px 0; border-top: 1px solid var(--linha); }
+.funil-tabela td.n { font: 600 14px var(--mono); text-align: right; }
+.funil-tabela th.n { text-align: right; }
+.mini-barra { height: 4px; border-radius: 99px; background: var(--sup-3); margin-top: 6px; overflow: hidden; }
+.mini-barra i { display: block; height: 100%; background: var(--acento); width: calc(var(--v) * 100%); transform-origin: left; animation: crescer .9s var(--suave-saida) both .2s; }
+.artes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.artes canvas { width: 100%; height: auto; border-radius: 14px; background: var(--sup-2); box-shadow: var(--sombra); }
+.artes figure { margin: 0; display: grid; gap: 10px; }
+.artes figcaption { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--suave); }
+.qr-caixa { background: #fff; border-radius: 16px; padding: 18px; width: 200px; justify-self: center; }
+.qr-caixa svg { width: 100%; height: auto; }
+.form-cupom { display: grid; grid-template-columns: 1.2fr .9fr .8fr .8fr 1fr auto; gap: 10px; align-items: end; }
+.codigo-cupom { font: 700 15px var(--mono); letter-spacing: .06em; }
+
+/* Página pública: cupom, lote e pagamento */
+.cupom-linha { display: flex; gap: 8px; }
+.cupom-linha input { text-transform: uppercase; font-family: var(--mono) !important; letter-spacing: .05em; }
+.cupom-msg { font-size: 13px; font-weight: 600; }
+.cupom-msg.ok { color: #11834F; } .cupom-msg.erro { color: #C0303F; }
+.preco s { color: var(--apagado); font-weight: 500; font-size: 13px; margin-right: 6px; }
+.lote { display: block; font-size: 12px; color: #9A4A1C; font-weight: 600; }
+.selo-cielo { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; color: var(--suave); }
+.selo-cielo svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; }
+.pagar-online { display: grid; gap: 12px; padding: 20px; border-radius: 18px; background: var(--texto); color: var(--bg); }
+.pagar-online b { font: 400 30px/1 var(--display); text-transform: uppercase; }
+.pagar-online .btn { --c: var(--cor); --t: var(--tinta); border: 0; width: 100%; height: 54px; font-size: 16px; }
+.pagar-online small { opacity: .7; font-size: 12px; text-align: center; }
+
+/* Agenda pública */
+.agenda { max-width: 1180px; margin: 0 auto; padding: 10px clamp(16px, 4vw, 40px) 80px; display: grid; gap: 28px; }
+.agenda h1 { font-size: clamp(56px, 10vw, 140px); }
+.lista-agenda { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 20px; }
+.cartao-agenda { --corte: 230px; text-decoration: none; display: flex; flex-direction: column; transition: transform .35s var(--suave-saida); animation: entrar .6s var(--suave-saida) both; animation-delay: calc(var(--i, 0) * 60ms); }
+.cartao-agenda:hover { transform: translateY(-4px) rotate(-.4deg); }
+.cartao-agenda .cartaz { height: 230px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--raio) var(--raio) 0 0; }
+.cartao-agenda .cartaz .display { font-size: 38px; line-height: 1; padding-top: .1em; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.cartao-agenda .corpo { padding: 16px 22px 20px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; color: var(--suave); }
+.cartao-agenda .corpo b { color: var(--texto); font: 700 16px var(--mono); }
+
+@media (max-width: 1080px) {
+    .k-links, .k-funil, .k-arte, .k-qr { grid-column: span 12; }
+    .form-cupom { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 760px) {
+    .canal { grid-template-columns: 1fr auto; }
+    .canal code { grid-column: 1 / -1; grid-row: 2; }
+    .artes { grid-template-columns: 1fr; }
+    .tipo-linha .desc, .tipo-linha .ate { grid-column: 1 / -1; }
+}
+.rolagem { overflow-x: auto; position: relative; }
+.abas { overflow-x: auto; scrollbar-width: none; }
+.abas a { white-space: nowrap; }
+@media (max-width: 760px) {
+    .tabela.simples { display: table; min-width: 560px; }
+    .tabela.simples thead { display: table-header-group; }
+    .tabela.simples tbody { display: table-row-group; }
+    .tabela.simples tr { display: table-row; padding: 0; }
+    .tabela.simples td { display: table-cell; width: auto; padding: 10px 12px; border-bottom: 1px solid var(--linha); }
+    .tabela.simples td.oculta-m, .tabela.simples th.oculta-m { display: none; }
+    .form-cupom { grid-template-columns: 1fr 1fr; }
+    .form-cupom .btn { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+    .barra-filtros .acoes { flex-wrap: wrap; flex-basis: 100%; justify-content: start; }
+    .barra-filtros .busca { max-width: none; flex-basis: 100%; }
+}

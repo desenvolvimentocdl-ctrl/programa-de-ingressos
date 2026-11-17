@@ -19,10 +19,21 @@
         <button class="btn" type="button" data-copiar="@link" data-aviso="Link da página copiado. É só enviar para o público.">Copiar link</button>
         <a class="btn" href="/eventos/@Model.Id/editar">Editar</a>
         <a class="btn pri" href="/eventos/@Model.Id/checkin">Abrir check-in</a>
+        <details class="menu">
+            <summary class="btn ico" aria-label="Mais ações">⋯</summary>
+            <div class="menu-itens">
+                <form method="post" asp-antiforgery="true" action="/eventos/@Model.Id/duplicar"><button>Duplicar evento</button></form>
+                <a href="/eventos/@Model.Id/divulgacao">Kit de divulgação</a>
+                <a href="/eventos/@Model.Id/exportar">Exportar planilha</a>
+                <hr>
+                <form method="post" asp-antiforgery="true" action="/eventos/@Model.Id/excluir" data-confirmar="Excluir este evento? Só é possível quando ainda não há inscrições."><button class="perigo">Excluir evento</button></form>
+            </div>
+        </details>
     </div>
 </section>
 <nav class="abas" aria-label="Seções do evento">
     <a href="/eventos/@Model.Id" class="@(aba == "painel" ? "on" : "")">Painel</a>
     <a href="/eventos/@Model.Id/participantes" class="@(aba == "participantes" ? "on" : "")">Participantes</a>
     <a href="/eventos/@Model.Id/checkin" class="@(aba == "checkin" ? "on" : "")">Check-in</a>
+    <a href="/eventos/@Model.Id/divulgacao" class="@(aba == "divulgacao" ? "on" : "")">Divulgação</a>
 </nav>
