@@ -9,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInfraestrutura(builder.Configuration);
 builder.Services.AddScoped<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
+builder.Services.AddScoped<Imagens>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(o =>
@@ -63,6 +64,15 @@ app.Use(async (ctx, next) =>
 });
 app.UseStatusCodePagesWithReExecute("/status/{0}");
 app.UseStaticFiles();
+// Capas enviadas pelos produtores (pasta configurável, fora do Git).
+var pastaUploads = Imagens.PastaConfigurada(app.Configuration, app.Environment);
+Directory.CreateDirectory(pastaUploads);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(pastaUploads),
+    RequestPath = "/uploads",
+    OnPrepareResponse = c => c.Context.Response.Headers.CacheControl = "public, max-age=604800"
+});
 app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();

@@ -1,6 +1,8 @@
 @{
     var cor = ViewData["Cor"] as string ?? "#FF6B4A";
     var tinta = Texto.TintaSobre(cor);
+    var logado = User.Identity?.IsAuthenticated == true;
+    var busca = Context.Request.Query["q"].ToString();
 }
 <!doctype html>
 <html lang="pt-BR">
@@ -14,17 +16,39 @@
         <meta name="description" content="@d">
         <meta property="og:title" content="@ViewData["Title"]">
         <meta property="og:description" content="@d">
+        <meta property="og:type" content="website">
     }
+    @if (ViewData["ImagemOg"] is string og) { <meta property="og:image" content="@og"> }
     <partial name="_Fontes" />
 </head>
 <body class="publico" style="--cor:@cor;--tinta:@tinta">
 @RenderSection("Topo", required: false)
 <header class="topo-publico">
-    <a class="marca" href="@(ViewData["LinkMarca"] as string ?? "#")" aria-label="Plateia"><partial name="_Marca" /></a>
+    <a class="marca" href="/" aria-label="Plateia, início"><partial name="_Marca" /></a>
+    <form class="busca-topo" action="/eventos" method="get" role="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" name="q" value="@busca" placeholder="Buscar eventos, produtores, cidades" aria-label="Buscar eventos">
+    </form>
+    <nav class="nav-publico" aria-label="Menu">
+        <a href="/eventos">Explorar</a>
+        <a href="@(logado ? "/eventos/novo" : "/criar-conta")">Criar evento</a>
+        @if (logado) { <a class="btn peq" href="/painel">Meu painel</a> }
+        else { <a class="btn peq" href="/entrar">Entrar</a> }
+    </nav>
     @RenderSection("TopoDireita", required: false)
 </header>
 @RenderBody()
-<footer class="rodape-publico">Ingressos por <b>Plateia</b></footer>
+<footer class="rodape-publico">
+    <div class="rodape-grade">
+        <div>
+            <span class="marca"><partial name="_Marca" /></span>
+            <p>Ingressos para palestras, cursos, encontros e shows. Inscrição em segundos, ingresso com QR code na hora.</p>
+        </div>
+        <div><b>Para o público</b><a href="/eventos">Explorar eventos</a><a href="/eventos?quando=fim-de-semana">Neste fim de semana</a><a href="/eventos?online=1">Eventos online</a><a href="/eventos?gratis=1">Gratuitos</a></div>
+        <div><b>Para produtores</b><a href="/criar-conta">Criar conta de produtor</a><a href="/entrar">Entrar no painel</a></div>
+    </div>
+    <small>Pagamentos processados pela Cielo · Ingressos por <b>Plateia</b></small>
+</footer>
 <script src="~/js/plateia.js" asp-append-version="true" defer></script>
 </body>
 </html>

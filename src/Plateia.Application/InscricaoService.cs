@@ -59,6 +59,9 @@ public class InscricaoService(IAppDbContext db)
                 throw new RegraNegocioException("Lotado: não há mais lugares neste evento.");
             if (tipo.Quantidade is { } q && await ativos.CountAsync(i => i.TipoIngressoId == tipo.Id) >= q)
                 throw new RegraNegocioException($"Os ingressos \"{tipo.Nome}\" esgotaram.");
+            if (tipo.EspacoId is { } espId && await db.Espacos.FirstOrDefaultAsync(x => x.Id == espId) is { } esp
+                && await ativos.CountAsync(i => i.TipoIngresso!.EspacoId == espId) >= esp.Capacidade)
+                throw new RegraNegocioException($"Lotado: não há mais lugares em \"{esp.Nome}\".");
 
             var codigo = Utilidades.NovoCodigo();
             while (await db.Inscricoes.AnyAsync(i => i.Codigo == codigo)) codigo = Utilidades.NovoCodigo();
@@ -112,7 +115,7 @@ public class InscricaoService(IAppDbContext db)
     {
         var codigo = Utilidades.NormalizarCodigo(codigoLido);
         if (codigo.Length == 0) return new(ResultadoCheckin.NaoEncontrado, null);
-        var i = await db.Inscricoes.Include(x => x.TipoIngresso)
+        var i = await db.Inscricoes.Include(x => x.TipoIngresso).ThenInclude(t => t!.Espaco)
             .FirstOrDefaultAsync(x => x.EventoId == eventoId && x.Codigo == codigo);
         if (i is null) return new(ResultadoCheckin.NaoEncontrado, null);
         if (!i.Ativa) return new(ResultadoCheckin.Cancelada, i);

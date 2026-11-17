@@ -1,0 +1,31 @@
+@model PaginaProdutor
+@{
+    Layout = "_LayoutPublico";
+    var p = Model.Produtor;
+    ViewData["Title"] = p.NomeExibicao + " · Plateia";
+    ViewData["Descricao"] = p.Bio ?? $"Eventos de {p.NomeExibicao}.";
+}
+<main class="vitrine">
+    <section class="perfil-produtor bilhete">
+        <span class="av grande-av">@Texto.Iniciais(p.NomeExibicao)</span>
+        <div>
+            <span class="cat">Produtor</span>
+            <h1 class="display">@p.NomeExibicao</h1>
+            @if (p.Cidade is { } cidadeP) { <p class="suave">@cidadeP</p> }
+            @if (p.Bio is { } b) { <p class="bio">@b</p> }
+            <div class="links-produtor">
+                @if (p.Instagram is { } ig) { <a class="btn peq" href="https://instagram.com/@ig" target="_blank" rel="noopener nofollow">@("@" + ig)</a> }
+                @if (p.Site is { } s) { <a class="btn peq" href="@s" target="_blank" rel="noopener nofollow">Site</a> }
+            </div>
+        </div>
+        <div class="numeros-produtor">
+            <div><b>@Model.Eventos.Count</b><span>abertos agora</span></div>
+            <div><b>@Model.Realizados</b><span>já realizados</span></div>
+        </div>
+    </section>
+    <section class="faixa">
+        <div class="faixa-topo"><h2 class="display">Próximos eventos</h2></div>
+        @if (Model.Eventos.Count == 0) { <p class="suave">Nenhum evento aberto no momento.</p> }
+        else { <div class="grade-pub">@foreach (var c in Model.Eventos) { <partial name="_CartaoPublico" model="c" /> }</div> }
+    </section>
+</main>

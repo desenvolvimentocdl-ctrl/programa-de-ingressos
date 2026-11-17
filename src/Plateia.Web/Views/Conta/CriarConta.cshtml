@@ -1,0 +1,53 @@
+@{
+    Layout = null;
+    var f = ViewBag.Form as dynamic;
+    var rnd = new Random(11);
+}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Criar conta de produtor · Plateia</title>
+    <partial name="_Fontes" />
+</head>
+<body>
+<div class="login">
+    <section class="login-arte cartaz" aria-hidden="true" style="--cor:#3DDC97;--tinta:#062014">
+        <a class="marca" href="/" style="text-decoration:none"><partial name="_Marca" /></a>
+        <div style="display:grid;gap:30px">
+            <h2 class="display">Seu evento,<br>sua plateia.</h2>
+            <ul class="vantagens">
+                <li>Página do evento com espaços, lotes e cupons</li>
+                <li>Venda com pagamento pela Cielo (cartão ou Pix)</li>
+                <li>Links e artes prontas para divulgar</li>
+                <li>Check-in por QR code no celular</li>
+            </ul>
+            <div class="assentos" style="--cols:24">@for (var i = 0; i < 96; i++) { <i class="@(rnd.Next(10) < 5 ? "pago" : "")" style="--i:@i"></i> }</div>
+        </div>
+        <small>Sem mensalidade para criar eventos.</small>
+    </section>
+    <section class="login-form">
+        <form method="post" asp-antiforgery="true" action="/criar-conta">
+            <h1>Criar conta</h1>
+            <p class="suave" style="margin-top:-8px">Para quem produz palestras, cursos, encontros e shows. Seu cadastro passa por uma aprovação rápida antes da primeira publicação.</p>
+            @if (ViewBag.Erro is string erro) { <div class="alerta-caixa erro" role="alert">@erro</div> }
+            <label class="campo">Seu nome<input name="nome" value="@f?.nome" required maxlength="120" autocomplete="name"></label>
+            <label class="campo">Nome do produtor <small>como aparece para o público (empresa, coletivo, marca). Opcional.</small><input name="marca" value="@f?.marca" maxlength="120" placeholder="Ex.: Estúdio Movimento"></label>
+            <div class="grade-form">
+                <label class="campo s3">WhatsApp<input name="telefone" value="@f?.telefone" inputmode="tel" autocomplete="tel"></label>
+                <label class="campo s3">Cidade<input name="cidade" value="@f?.cidade" maxlength="80"></label>
+            </div>
+            <label class="campo">E-mail<input type="email" name="email" value="@f?.email" required maxlength="180" autocomplete="email"></label>
+            <div class="grade-form">
+                <label class="campo s3">Senha <small>mín. 8</small><input type="password" name="senha" required minlength="8" autocomplete="new-password"></label>
+                <label class="campo s3">Confirme<input type="password" name="confirmacao" required minlength="8" autocomplete="new-password"></label>
+            </div>
+            <label class="check"><input type="checkbox" name="aceite" value="true" required> Li e aceito os termos de uso e a política de privacidade.</label>
+            <button class="btn pri grande">Criar conta</button>
+            <p class="suave" style="font-size:14px;text-align:center">Já tem conta? <a href="/entrar">Entrar</a></p>
+        </form>
+    </section>
+</div>
+</body>
+</html>

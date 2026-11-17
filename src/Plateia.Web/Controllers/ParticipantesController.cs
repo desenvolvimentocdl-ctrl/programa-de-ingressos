@@ -20,7 +20,7 @@ public class ParticipantesController(AppDbContext db, EventoService eventos, Ins
         if (e is null) return NotFound();
         filtro = Filtros.Contains(filtro) ? filtro! : "todos";
 
-        var consulta = db.Inscricoes.Include(i => i.TipoIngresso).Include(i => i.Cupom).Where(i => i.EventoId == id);
+        var consulta = db.Inscricoes.Include(i => i.TipoIngresso).ThenInclude(t => t!.Espaco).Include(i => i.Cupom).Where(i => i.EventoId == id);
         consulta = filtro switch
         {
             "pagos" => consulta.Where(i => i.Status == StatusInscricao.Confirmada && i.Pagamento == StatusPagamento.Pago),
@@ -172,7 +172,7 @@ public class ParticipantesController(AppDbContext db, EventoService eventos, Ins
             presentes,
             inscricao = i is null ? null : new
             {
-                i.Id, i.Nome, i.Codigo, tipo = i.TipoIngresso?.Nome, pagamento = Texto.NomePagamento(i.Pagamento),
+                i.Id, i.Nome, i.Codigo, tipo = i.TipoIngresso?.Espaco is { } esp ? $"{esp.Nome} · {i.TipoIngresso.Nome}" : i.TipoIngresso?.Nome, pagamento = Texto.NomePagamento(i.Pagamento),
                 valor = Hora.Dinheiro(i.Valor), hora = i.CheckinEm is { } c ? Hora.Hhmm(c) : null, iniciais = Texto.Iniciais(i.Nome)
             }
         });

@@ -65,7 +65,7 @@ namespace Plateia.Infrastructure.Migrations
                     b.ToTable("Cupons");
                 });
 
-            modelBuilder.Entity("Plateia.Domain.Evento", b =>
+            modelBuilder.Entity("Plateia.Domain.EspacoEvento", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -75,6 +75,58 @@ namespace Plateia.Infrastructure.Migrations
 
                     b.Property<int>("Capacidade")
                         .HasColumnType("int");
+
+                    b.Property<string>("Descricao")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<int>("EventoId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventoId");
+
+                    b.ToTable("Espacos", (string)null);
+                });
+
+            modelBuilder.Entity("Plateia.Domain.Evento", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Bairro")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<int>("Capacidade")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Categoria")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Cep")
+                        .HasMaxLength(9)
+                        .HasColumnType("varchar(9)");
+
+                    b.Property<string>("Cidade")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("Classificacao")
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
 
                     b.Property<string>("Cor")
                         .IsRequired()
@@ -88,12 +140,22 @@ namespace Plateia.Infrastructure.Migrations
                         .HasMaxLength(8000)
                         .HasColumnType("varchar(8000)");
 
+                    b.Property<bool>("Destaque")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<string>("Endereco")
                         .HasMaxLength(250)
                         .HasColumnType("varchar(250)");
 
                     b.Property<DateTime?>("FimEm")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Formato")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Imagem")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
 
                     b.Property<DateTime>("InicioEm")
                         .HasColumnType("datetime(6)");
@@ -104,6 +166,10 @@ namespace Plateia.Infrastructure.Migrations
                     b.Property<string>("InstrucoesPagamento")
                         .HasMaxLength(2000)
                         .HasColumnType("varchar(2000)");
+
+                    b.Property<string>("LinkOnline")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
 
                     b.Property<string>("Local")
                         .IsRequired()
@@ -130,12 +196,20 @@ namespace Plateia.Infrastructure.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("varchar(160)");
 
+                    b.Property<string>("Uf")
+                        .HasMaxLength(2)
+                        .HasColumnType("varchar(2)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("Cidade");
 
                     b.HasIndex("OrganizadorId");
 
                     b.HasIndex("Slug")
                         .IsUnique();
+
+                    b.HasIndex("Status", "InicioEm");
 
                     b.ToTable("Eventos");
                 });
@@ -267,6 +341,9 @@ namespace Plateia.Infrastructure.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("varchar(300)");
 
+                    b.Property<int?>("EspacoId")
+                        .HasColumnType("int");
+
                     b.Property<int>("EventoId")
                         .HasColumnType("int");
 
@@ -290,6 +367,8 @@ namespace Plateia.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EspacoId");
+
                     b.HasIndex("EventoId");
 
                     b.ToTable("TiposIngresso");
@@ -303,8 +382,19 @@ namespace Plateia.Infrastructure.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("Aprovado")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<bool>("Ativo")
                         .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Bio")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("Cidade")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
 
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("datetime(6)");
@@ -314,8 +404,16 @@ namespace Plateia.Infrastructure.Migrations
                         .HasMaxLength(180)
                         .HasColumnType("varchar(180)");
 
+                    b.Property<string>("Instagram")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
                     b.Property<string>("Nome")
                         .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("NomePublico")
                         .HasMaxLength(120)
                         .HasColumnType("varchar(120)");
 
@@ -327,6 +425,14 @@ namespace Plateia.Infrastructure.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("varchar(300)");
 
+                    b.Property<string>("Site")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("Slug")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
                     b.Property<string>("Telefone")
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
@@ -334,6 +440,9 @@ namespace Plateia.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("Slug")
                         .IsUnique();
 
                     b.ToTable("Usuarios");
@@ -380,6 +489,17 @@ namespace Plateia.Infrastructure.Migrations
                     b.Navigation("Evento");
                 });
 
+            modelBuilder.Entity("Plateia.Domain.EspacoEvento", b =>
+                {
+                    b.HasOne("Plateia.Domain.Evento", "Evento")
+                        .WithMany("Espacos")
+                        .HasForeignKey("EventoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Evento");
+                });
+
             modelBuilder.Entity("Plateia.Domain.Evento", b =>
                 {
                     b.HasOne("Plateia.Domain.Usuario", "Organizador")
@@ -419,11 +539,18 @@ namespace Plateia.Infrastructure.Migrations
 
             modelBuilder.Entity("Plateia.Domain.TipoIngresso", b =>
                 {
+                    b.HasOne("Plateia.Domain.EspacoEvento", "Espaco")
+                        .WithMany()
+                        .HasForeignKey("EspacoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Plateia.Domain.Evento", "Evento")
                         .WithMany("Tipos")
                         .HasForeignKey("EventoId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Espaco");
 
                     b.Navigation("Evento");
                 });
@@ -440,6 +567,8 @@ namespace Plateia.Infrastructure.Migrations
             modelBuilder.Entity("Plateia.Domain.Evento", b =>
                 {
                     b.Navigation("Cupons");
+
+                    b.Navigation("Espacos");
 
                     b.Navigation("Inscricoes");
 

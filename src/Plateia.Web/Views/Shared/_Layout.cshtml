@@ -15,17 +15,18 @@
 </head>
 <body>
 <header class="topo">
-    <a class="marca" href="/" aria-label="Plateia, início"><partial name="_Marca" /></a>
+    <a class="marca" href="/painel" aria-label="Plateia, painel"><partial name="_Marca" /></a>
     <nav aria-label="Menu principal">
-        <a href="/" class="@(rota == "/" || rota.StartsWith("/eventos") ? "on" : "")">Eventos</a>
+        <a href="/painel" class="@(rota.StartsWith("/painel") || rota.StartsWith("/eventos") ? "on" : "")">Meus eventos</a>
         @if (admin)
         {
-            <a href="/organizadores" class="@(rota.StartsWith("/organizadores") ? "on" : "")">Organizadores</a>
+            <a href="/organizadores" class="@(rota.StartsWith("/organizadores") ? "on" : "")">Produtores</a>
         }
+        <a href="/" target="_blank" rel="noopener">Ver vitrine ↗</a>
     </nav>
     <div class="eu">
         <a href="/minha-conta" title="Minha conta">
-            <span class="eu-txt" style="text-align:right"><b>@User.Identity?.Name</b><small>@(admin ? "Administrador" : "Organizador")</small></span>
+            <span class="eu-txt" style="text-align:right"><b>@User.Identity?.Name</b><small>@(admin ? "Administrador" : "Produtor")</small></span>
             <span class="av">@Texto.Iniciais(User.Identity?.Name)</span>
         </a>
         <form method="post" asp-antiforgery="true" action="/sair"><button class="btn fantasma ico" title="Sair" aria-label="Sair"><svg viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg></button></form>

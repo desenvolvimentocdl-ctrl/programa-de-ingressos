@@ -1,5 +1,6 @@
 using Plateia.Application;
 using Plateia.Domain;
+using Texto_ = Plateia.Web.Infra.Texto;
 
 namespace Plateia.Web.ViewModels;
 
@@ -25,14 +26,16 @@ public class PaginaEvento
     public required bool Previa { get; init; }
     public bool PagamentoOnline { get; init; }
     public bool TemCupons { get; init; }
+    public List<ResumoEspaco> Espacos { get; init; } = [];
+    public List<CartaoPublico> Relacionados { get; set; } = [];
     /// <summary>Canal de divulgação de onde a pessoa veio (vai junto na inscrição).</summary>
     public string? Canal { get; set; }
     public bool AceitaInscricoes => Evento.Status == StatusEvento.Publicado && Evento.InscricoesAbertas && Livres > 0;
 }
 
-public record OrganizadorLinha(int Id, string Nome, string Email, string? Telefone, Perfil Perfil, bool Ativo, int Eventos);
+public record OrganizadorLinha(int Id, string Nome, string Email, string? Telefone, Perfil Perfil, bool Ativo, int Eventos,
+    bool Aprovado = true, string? NomePublico = null, string? Slug = null, string? Cidade = null);
 
-public record CartaoAgenda(string Slug, string Titulo, string? Subtitulo, string Local, DateTime InicioEm, string Cor, decimal MenorPreco, int Livres, bool Abertas);
 
 public class PaginaDivulgacao
 {
@@ -42,4 +45,49 @@ public class PaginaDivulgacao
     public required List<UsoCupom> Cupons { get; init; }
     public required int Confirmados { get; init; }
     public decimal MenorPreco { get; init; }
+}
+
+public class PaginaInicio
+{
+    public required List<CartaoPublico> Destaques { get; init; }
+    public required List<CartaoPublico> EstaSemana { get; init; }
+    public required List<CartaoPublico> Proximos { get; init; }
+    public required List<CartaoPublico> Online { get; init; }
+    public required Dictionary<CategoriaEvento, int> Categorias { get; init; }
+    public required List<(string Cidade, int Total)> Cidades { get; init; }
+    public required int Total { get; init; }
+}
+
+public class PaginaBusca
+{
+    public required List<CartaoPublico> Itens { get; init; }
+    public string? Texto { get; init; }
+    public CategoriaEvento? Categoria { get; init; }
+    public string? Cidade { get; init; }
+    public string? Quando { get; init; }
+    public bool Online { get; init; }
+    public bool Gratis { get; init; }
+    public required Dictionary<CategoriaEvento, int> Categorias { get; init; }
+    public required List<(string Cidade, int Total)> Cidades { get; init; }
+
+    /// <summary>Monta o link da busca trocando um filtro e mantendo os outros.</summary>
+    public string Link(string? texto = "\0", string? categoria = "\0", string? cidade = "\0", string? quando = "\0", bool? online = null, bool? gratis = null)
+    {
+        var p = new List<string>();
+        void Add(string k, string? v) { if (!string.IsNullOrEmpty(v)) p.Add($"{k}={Uri.EscapeDataString(v)}"); }
+        Add("q", texto == "\0" ? Texto : texto);
+        Add("categoria", categoria == "\0" ? (Categoria is { } c ? Texto_.SlugCategoria(c) : null) : categoria);
+        Add("cidade", cidade == "\0" ? Cidade : cidade);
+        Add("quando", quando == "\0" ? Quando : quando);
+        if (online ?? Online) p.Add("online=1");
+        if (gratis ?? Gratis) p.Add("gratis=1");
+        return "/eventos" + (p.Count > 0 ? "?" + string.Join("&", p) : "");
+    }
+}
+
+public class PaginaProdutor
+{
+    public required Usuario Produtor { get; init; }
+    public required List<CartaoPublico> Eventos { get; init; }
+    public required int Realizados { get; init; }
 }

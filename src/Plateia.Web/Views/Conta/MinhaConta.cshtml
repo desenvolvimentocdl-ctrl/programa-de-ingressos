@@ -6,6 +6,16 @@
         <h2>Dados</h2>
         <label class="campo">Nome<input name="nome" value="@Model.Nome" required maxlength="120"></label>
         <label class="campo">Telefone / WhatsApp<input name="telefone" value="@Model.Telefone" inputmode="tel"></label>
+        <h2 style="margin-top:8px">Perfil público</h2>
+        @{ var paginaPublica = Model.Slug is not null && Model.Aprovado ? "/p/" + Model.Slug : null; }
+        <p class="suave" style="font-size:14px;margin-top:-10px">Aparece na página dos seus eventos.@if (paginaPublica is not null) { <text> Sua página: <a href="@paginaPublica" target="_blank">@paginaPublica</a></text> }</p>
+        <label class="campo">Nome do produtor <small>empresa, coletivo ou marca (vazio = seu nome)</small><input name="marca" value="@Model.NomePublico" maxlength="120"></label>
+        <label class="campo">Sobre <small>até 1000 caracteres</small><textarea name="bio" rows="4" maxlength="1000">@Model.Bio</textarea></label>
+        <div class="grade-form">
+            <label class="campo s3">Instagram<input name="instagram" value="@Model.Instagram" maxlength="60" placeholder="@@seuperfil"></label>
+            <label class="campo s3">Cidade<input name="cidade" value="@Model.Cidade" maxlength="80"></label>
+        </div>
+        <label class="campo">Site<input name="site" value="@Model.Site" maxlength="200" placeholder="https://"></label>
         <button class="btn pri" style="justify-self:start">Salvar</button>
     </form>
     <form class="secao" method="post" asp-antiforgery="true" action="/minha-conta/senha" style="grid-column:span 6">

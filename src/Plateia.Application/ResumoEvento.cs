@@ -10,7 +10,12 @@ public enum TipoAcontecimento { Inscreveu, Pagou, Entrou, Cancelou }
 
 public record Acontecimento(DateTime Quando, TipoAcontecimento Tipo, string Nome);
 
-public record ResumoTipo(int Id, string Nome, decimal Preco, int? Quantidade, int Vendidos, bool Ativo, DateTime? VendasAte = null, string? Descricao = null)
+public record ResumoEspaco(int Id, string Nome, string? Descricao, int Capacidade, int Ocupados)
+{
+    public int Livres => Math.Max(0, Capacidade - Ocupados);
+}
+
+public record ResumoTipo(int Id, string Nome, decimal Preco, int? Quantidade, int Vendidos, bool Ativo, DateTime? VendasAte = null, string? Descricao = null, int? EspacoId = null)
 {
     public bool Esgotado => Quantidade is { } q && Vendidos >= q;
     public bool Encerrado => VendasAte is { } v && DateTime.UtcNow > v;
@@ -36,8 +41,12 @@ public class ResumoEvento
     public double Ocupacao => Evento.Capacidade == 0 ? 0 : Math.Min(1, (double)Confirmados / Evento.Capacidade);
 
     public List<ResumoTipo> PorTipo => Evento.Tipos.OrderBy(t => t.Ordem)
-        .Select(t => new ResumoTipo(t.Id, t.Nome, t.Preco, t.Quantidade, Ativas.Count(l => l.TipoId == t.Id), t.Ativo, t.VendasAte, t.Descricao))
+        .Select(t => new ResumoTipo(t.Id, t.Nome, t.Preco, t.Quantidade, Ativas.Count(l => l.TipoId == t.Id), t.Ativo, t.VendasAte, t.Descricao, t.EspacoId))
         .Where(t => t.Ativo || t.Vendidos > 0).ToList();
+
+    public List<ResumoEspaco> PorEspaco => Evento.Espacos.OrderBy(x => x.Ordem)
+        .Select(x => new ResumoEspaco(x.Id, x.Nome, x.Descricao, x.Capacidade,
+            Ativas.Count(l => Evento.Tipos.FirstOrDefault(t => t.Id == l.TipoId)?.EspacoId == x.Id))).ToList();
 
     /// <summary>Inscrições por dia (datas locais), dos últimos <paramref name="dias"/> dias.</summary>
     public List<(DateTime Dia, int Total)> PorDia(int dias, Func<DateTime, DateTime> paraLocal, DateTime hojeLocal)

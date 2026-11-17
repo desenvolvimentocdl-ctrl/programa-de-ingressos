@@ -1,0 +1,96 @@
+@model PaginaInicio
+@{
+    Layout = "_LayoutPublico";
+    ViewData["Title"] = "Plateia · Eventos, cursos e encontros";
+    ViewData["Descricao"] = "Encontre palestras, cursos, workshops, shows e encontros. Inscrição em segundos e ingresso com QR code.";
+    var rnd = new Random(3);
+}
+<section class="vitrine-hero">
+    <div class="vh-texto">
+        <h1 class="display">Encontre seu<br>próximo lugar<br>na plateia.</h1>
+        <p>@Model.Total evento(s) com inscrições abertas: palestras, cursos, encontros e shows, presenciais e online.</p>
+        <form class="busca-hero" action="/eventos" method="get" role="search">
+            <label><span>O quê</span><input name="q" placeholder="Palestra, workshop, show…"></label>
+            <label><span>Onde</span>
+                <select name="cidade">
+                    <option value="">Todas as cidades</option>
+                    @foreach (var (c, n) in Model.Cidades) { <option value="@c">@c (@n)</option> }
+                    <option value="Online">Online</option>
+                </select>
+            </label>
+            <label><span>Quando</span>
+                <select name="quando"><option value="">Qualquer data</option><option value="hoje">Hoje</option><option value="fim-de-semana">Fim de semana</option><option value="semana">Próximos 7 dias</option><option value="mes">Próximos 30 dias</option></select>
+            </label>
+            <button class="btn pri grande">Buscar</button>
+        </form>
+    </div>
+    <div class="vh-arte" aria-hidden="true">
+        <div class="assentos" style="--cols:14">
+            @for (var i = 0; i < 126; i++) { <i class="@(rnd.Next(10) < 6 ? "pago" : "")" style="--i:@i"></i> }
+        </div>
+    </div>
+</section>
+
+<main class="vitrine">
+    <nav class="categorias" aria-label="Categorias">
+        @foreach (var c in Enum.GetValues<CategoriaEvento>().Where(c => Model.Categorias.ContainsKey(c)))
+        {
+            <a href="/eventos?categoria=@Texto.SlugCategoria(c)">@Texto.NomeCategoria(c) <b>@Model.Categorias[c]</b></a>
+        }
+    </nav>
+
+    @if (Model.Destaques.Count > 0)
+    {
+        <section class="faixa">
+            <div class="faixa-topo"><h2 class="display">Em destaque</h2></div>
+            <div class="trilho">
+                @foreach (var c in Model.Destaques)
+                {
+                    <div class="trilho-item"><partial name="_CartaoPublico" model="c" /></div>
+                }
+            </div>
+        </section>
+    }
+
+    @if (Model.EstaSemana.Count > 0)
+    {
+        <section class="faixa">
+            <div class="faixa-topo"><h2 class="display">Nesta semana</h2><a href="/eventos?quando=semana">Ver todos →</a></div>
+            <div class="grade-pub">@foreach (var c in Model.EstaSemana.Take(4)) { <partial name="_CartaoPublico" model="c" /> }</div>
+        </section>
+    }
+
+    @if (Model.Cidades.Count > 0)
+    {
+        <section class="faixa">
+            <div class="faixa-topo"><h2 class="display">Por cidade</h2></div>
+            <div class="cidades">
+                @foreach (var (c, n) in Model.Cidades)
+                {
+                    <a href="/eventos?cidade=@Uri.EscapeDataString(c)"><b>@c</b><span>@n evento(s)</span></a>
+                }
+                @if (Model.Online.Count > 0) { <a href="/eventos?online=1" class="online"><b>Online</b><span>de qualquer lugar</span></a> }
+            </div>
+        </section>
+    }
+
+    <section class="faixa">
+        <div class="faixa-topo"><h2 class="display">Próximos eventos</h2><a href="/eventos">Explorar tudo →</a></div>
+        @if (Model.Proximos.Count == 0)
+        {
+            <p class="suave">Nenhum evento aberto agora. Volte em breve!</p>
+        }
+        else
+        {
+            <div class="grade-pub">@foreach (var c in Model.Proximos) { <partial name="_CartaoPublico" model="c" /> }</div>
+        }
+    </section>
+
+    <section class="chamada-produtor bilhete">
+        <div>
+            <h2 class="display">Vai organizar um evento?</h2>
+            <p>Crie a página, venda ingressos com pagamento pela Cielo, divulgue com links e artes prontas e faça o check-in pelo celular.</p>
+        </div>
+        <a class="btn pri grande" href="/criar-conta">Criar meu evento</a>
+    </section>
+</main>

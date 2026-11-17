@@ -3,7 +3,7 @@
     var aba = ViewData["Aba"] as string ?? "painel";
     var link = $"{Context.Request.Scheme}://{Context.Request.Host}/e/{Model.Slug}";
 }
-<a class="voltar" href="/">← Eventos</a>
+<a class="voltar" href="/painel">← Meus eventos</a>
 <section class="cartaz cabeca-evento" style="--cor:@Model.Cor;--tinta:@Texto.TintaSobre(Model.Cor);view-transition-name:ev-@Model.Id">
     <div>
         <span class="mono" style="font-size:13px;font-weight:600">Nº @Texto.Numero(Model.Id) · @Texto.NomeStatus(Model.Status)@(Model.Status == StatusEvento.Publicado && !Model.InscricoesAbertas ? " · inscrições fechadas" : "")</span>

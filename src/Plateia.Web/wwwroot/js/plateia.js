@@ -320,6 +320,78 @@
         });
     }
 
+    // Compartilhar evento (menu nativo do celular, ou copia o link)
+    document.addEventListener("click", async e => {
+        const b = e.target.closest("[data-compartilhar]");
+        if (!b) return;
+        const url = b.dataset.compartilhar;
+        if (navigator.share) { try { await navigator.share({ title: b.dataset.titulo, url }); return; } catch { return; } }
+        try { await navigator.clipboard.writeText(url); aviso("Link do evento copiado."); } catch { prompt("Copie:", url); }
+    });
+
+    // ---------- Formulário do evento: espaços ligados aos ingressos ----------
+    const listaEsp = $("#espacos");
+    if (listaEsp) {
+        let novos = 1000;
+        const escH = t => String(t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        const capTotal = $("input[name=capacidade]");
+        const linhasEsp = () => $$(".espaco-linha:not(.removido)", listaEsp);
+        const sincronizar = () => {
+            const ops = linhasEsp().map(l => ({
+                chave: $("input[name=espaco_chave]", l).value,
+                nome: $("[data-nome-espaco]", l).value.trim() || "Espaço sem nome",
+                cap: parseInt($("[data-cap-espaco]", l).value, 10) || 0
+            }));
+            $$("select[name=tipo_espaco]").forEach(sel => {
+                const atual = sel.value || sel.dataset.espacoAtual;
+                // Sem espaços, um valor vazio continua sendo enviado para não desalinhar as listas do formulário.
+                sel.innerHTML = ops.length ? ops.map(o => `<option value="${escH(o.chave)}">${escH(o.nome)}</option>`).join("") : `<option value=""></option>`;
+                if (ops.some(o => o.chave === atual)) sel.value = atual;
+                sel.dataset.espacoAtual = sel.value;
+                sel.closest(".campo").hidden = ops.length === 0;
+            });
+            const soma = ops.reduce((a, o) => a + o.cap, 0);
+            $("#soma-espacos").textContent = ops.length ? `Lotação total: ${soma.toLocaleString("pt-BR")} lugares` : "";
+            $(".capacidade-total").hidden = ops.length > 0;
+            if (ops.length && soma > 0) capTotal.value = soma;
+        };
+        $("#add-espaco").addEventListener("click", () => {
+            const n = $("#modelo-espaco").content.firstElementChild.cloneNode(true);
+            $("input[name=espaco_chave]", n).value = "n" + (novos++);
+            listaEsp.append(n);
+            sincronizar();
+            $("[data-nome-espaco]", n).focus();
+        });
+        listaEsp.addEventListener("click", e => {
+            const b = e.target.closest("[data-remover-espaco]");
+            if (!b) return;
+            const l = b.closest(".espaco-linha");
+            if (!$("input[name=espaco_id]", l).value) l.remove();
+            else {
+                $("input[name=espaco_remover]", l).value = "1";
+                $$("[required]", l).forEach(i => i.required = false);
+                l.classList.add("removido");
+            }
+            sincronizar();
+        });
+        listaEsp.addEventListener("input", sincronizar);
+        $("#add-tipo")?.addEventListener("click", () => setTimeout(sincronizar));
+        sincronizar();
+
+        // Prévia da capa escolhida e do formato
+        $("[data-previa-capa]")?.addEventListener("change", e => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            const cartaz = $(".previa .cartaz");
+            let img = $(".previa-img", cartaz);
+            if (!img) { img = document.createElement("img"); img.className = "previa-img"; img.alt = ""; cartaz.prepend(img); }
+            img.src = URL.createObjectURL(f);
+        });
+        $$("input[name=formato]").forEach(r => r.addEventListener("change", () => {
+            if (r.checked && r.value === "Online") $("#previa-local").textContent = "Online";
+        }));
+    }
+
     // ---------- Portaria ----------
     const portaria = $("#form-checkin");
     if (portaria) {

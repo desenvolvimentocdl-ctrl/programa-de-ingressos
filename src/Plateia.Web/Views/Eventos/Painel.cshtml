@@ -95,7 +95,20 @@
     </section>
 
     <section class="bloco b-tipos" style="--i:3">
-        <h2>Por tipo de ingresso</h2>
+        <h2>@(e.Espacos.Count > 0 ? "Espaços e ingressos" : "Por tipo de ingresso")</h2>
+        @if (e.Espacos.Count > 0)
+        {
+            <div class="tipos">
+                @foreach (var x in Model.PorEspaco)
+                {
+                    <div class="t">
+                        <div><span><b>@x.Nome</b> <span class="suave">· espaço</span></span><span class="mono">@x.Ocupados<span class="suave">/@x.Capacidade</span></span></div>
+                        <div class="barra"><i style="--v:@Texto.N(Math.Min(1, x.Ocupados / (double)Math.Max(1, x.Capacidade)));--c:var(--info)"></i></div>
+                    </div>
+                }
+            </div>
+            <div class="picote" style="margin:4px 0"></div>
+        }
         <div class="tipos">
             @foreach (var t in Model.PorTipo)
             {

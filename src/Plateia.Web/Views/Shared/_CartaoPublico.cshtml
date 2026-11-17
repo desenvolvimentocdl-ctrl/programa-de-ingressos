@@ -1,0 +1,28 @@
+@model CartaoPublico
+@{
+    var l = Hora.Local(Model.InicioEm);
+    var tinta = Texto.TintaSobre(Model.Cor);
+}
+<a class="cartao-pub" href="/e/@Model.Slug" style="--cor:@Model.Cor;--tinta:@tinta">
+    @* A cor vai no próprio elemento: .cartaz redefine --cor, então herdar do link não basta. *@
+    <div class="capa @(Model.Imagem is null ? "cartaz" : "")" style="--cor:@Model.Cor;--tinta:@tinta">
+        @if (Model.Imagem is { } img)
+        {
+            <img src="@img" alt="" loading="lazy" decoding="async">
+        }
+        else
+        {
+            <span class="display">@Model.Titulo</span>
+        }
+        <span class="data-selo"><small>@l.ToString("MMM", Hora.PtBr).TrimEnd('.')</small><b>@l.Day</b></span>
+        @if (Model.Lotado) { <span class="selo-lotado">Esgotado</span> }
+        else if (Model.Formato != FormatoEvento.Presencial) { <span class="selo-online">@Texto.NomeFormato(Model.Formato)</span> }
+    </div>
+    <div class="info">
+        <span class="cat">@Texto.NomeCategoria(Model.Categoria)</span>
+        <h3>@Model.Titulo</h3>
+        <p class="quando">@Hora.Data(Model.InicioEm)</p>
+        <p class="onde">@Texto.Onde(Model)</p>
+        <div class="rodape-cartao"><span class="preco-cartao">@Texto.PrecoCartao(Model)</span><span class="produtor">@Model.Produtor</span></div>
+    </div>
+</a>

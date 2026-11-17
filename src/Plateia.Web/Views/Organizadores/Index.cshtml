@@ -5,7 +5,7 @@
     var n = 0;
 }
 <div class="cabeca">
-    <div><h1>Organizadores</h1><p>Palestrantes e representantes que acessam o painel dos próprios eventos.</p></div>
+    <div><h1>Produtores</h1><p>Quem cria eventos na plataforma. Cadastros novos aparecem no topo, aguardando aprovação.</p></div>
     <button class="btn pri" type="button" data-abrir="#dlg-org"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Novo acesso</button>
 </div>
 
@@ -24,14 +24,21 @@
         @foreach (var u in Model)
         {
             <tr class="@(u.Ativo ? "" : "cancelada")" style="--i:@(n++)">
-                <td><div class="pessoa"><span class="av">@Texto.Iniciais(u.Nome)</span><div><b>@u.Nome</b><small>@u.Email@(u.Telefone is { } t ? $" · {t}" : "")</small></div></div></td>
+                <td><div class="pessoa"><span class="av">@Texto.Iniciais(u.Nome)</span><div><b>@(u.NomePublico ?? u.Nome)</b><small>@(u.NomePublico is null ? "" : u.Nome + " · ")@u.Email@(u.Telefone is { } t ? $" · {t}" : "")@(u.Cidade is { } c ? $" · {c}" : "")</small></div></div></td>
                 <td class="oculta-m">@Texto.NomePerfil(u.Perfil)</td>
                 <td class="oculta-m mono">@u.Eventos</td>
-                <td><span class="pilula @(u.Ativo ? "ok" : "")">@(u.Ativo ? "Ativo" : "Desativado")</span></td>
+                <td>
+                    @if (!u.Aprovado)
+                    {
+                        <form method="post" asp-antiforgery="true" action="/organizadores/@u.Id/aprovar" style="display:inline-flex;gap:8px;align-items:center"><span class="pilula alerta">Em análise</span><button class="btn peq pri">Aprovar</button></form>
+                    }
+                    else { <span class="pilula @(u.Ativo ? "ok" : "")">@(u.Ativo ? "Ativo" : "Desativado")</span> }
+                </td>
                 <td class="col-acoes">
                     <details class="menu">
                         <summary class="btn fantasma ico" aria-label="Ações para @u.Nome">⋯</summary>
                         <div class="menu-itens">
+                            @if (u.Slug is { } us && u.Aprovado) { <a href="/p/@us" target="_blank" rel="noopener">Ver página pública</a> }
                             <form method="post" asp-antiforgery="true" action="/organizadores/@u.Id/senha" data-confirmar="Gerar uma nova senha para @u.Nome? A senha atual deixa de funcionar."><button>Gerar nova senha</button></form>
                             <form method="post" asp-antiforgery="true" action="/organizadores/@u.Id/ativo"><input type="hidden" name="ativo" value="@(u.Ativo ? "false" : "true")"><button class="@(u.Ativo ? "perigo" : "")">@(u.Ativo ? "Desativar acesso" : "Reativar acesso")</button></form>
                         </div>

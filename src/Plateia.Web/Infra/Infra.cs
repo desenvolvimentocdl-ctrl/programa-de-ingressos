@@ -27,7 +27,7 @@ public abstract class BaseController : Controller
     {
         TempData["msg"] = mensagem;
         var referer = Request.Headers.Referer.ToString();
-        return Redirect(url ?? (referer.Length > 0 ? referer : "/"));
+        return Redirect(url ?? (referer.Length > 0 ? referer : "/painel"));
     }
 
     protected bool QuerJson => Request.Headers.Accept.ToString().Contains("application/json");
@@ -152,11 +152,40 @@ public static class Texto
     }
 
     /// <summary>Menor preço pago à venda (ignora cortesias e lotes encerrados); 0 quando o evento é todo gratuito.</summary>
-    public static decimal APartirDe(IEnumerable<TipoIngresso> tipos)
+    public static decimal APartirDe(IEnumerable<TipoIngresso> tipos) => CatalogoService.APartirDe(tipos);
+
+    public static string NomeCategoria(CategoriaEvento c) => c switch
     {
-        var aVenda = tipos.Where(t => t.Ativo && !t.VendaEncerrada(DateTime.UtcNow) && t.Preco > 0).Select(t => t.Preco).ToList();
-        return aVenda.Count == 0 ? 0 : aVenda.Min();
-    }
+        CategoriaEvento.Negocios => "Negócios",
+        CategoriaEvento.Cursos => "Cursos e workshops",
+        CategoriaEvento.Tecnologia => "Tecnologia",
+        CategoriaEvento.Marketing => "Marketing e vendas",
+        CategoriaEvento.Saude => "Saúde e bem-estar",
+        CategoriaEvento.Gastronomia => "Gastronomia",
+        CategoriaEvento.Musica => "Música e shows",
+        CategoriaEvento.ArteCultura => "Arte, teatro e cultura",
+        CategoriaEvento.Esportes => "Esportes",
+        CategoriaEvento.Infantil => "Infantil",
+        CategoriaEvento.Networking => "Networking",
+        _ => "Outros"
+    };
+
+    public static string SlugCategoria(CategoriaEvento c) => c.ToString().ToLowerInvariant();
+
+    public static CategoriaEvento? CategoriaDoSlug(string? s) =>
+        Enum.GetValues<CategoriaEvento>().Cast<CategoriaEvento?>().FirstOrDefault(c => SlugCategoria(c!.Value) == (s ?? "").ToLowerInvariant());
+
+    public static string NomeFormato(FormatoEvento f) => f switch { FormatoEvento.Online => "Online", FormatoEvento.Hibrido => "Presencial + online", _ => "Presencial" };
+
+    /// <summary>Endereço para abrir no mapa (Google Maps, sem chave de API).</summary>
+    public static string LinkMapa(Evento e) =>
+        "https://www.google.com/maps/search/?api=1&query=" + Uri.EscapeDataString(string.Join(", ",
+            new[] { e.Local, e.Endereco, e.Bairro, e.CidadeUf }.Where(x => !string.IsNullOrWhiteSpace(x))));
+
+    public static string Onde(CartaoPublico c) => c.Formato == FormatoEvento.Online ? "Online" :
+        string.Join(" · ", new[] { c.Local, c.Cidade is null ? null : $"{c.Cidade}/{c.Uf}" }.Where(x => x is not null));
+
+    public static string PrecoCartao(CartaoPublico c) => c.Gratuito ? "Gratuito" : "a partir de " + Hora.Dinheiro(c.APartirDe);
 
     /// <summary>Número para CSS (sempre com ponto, independente da cultura do servidor).</summary>
     public static string N(double v) => v.ToString("0.####", CultureInfo.InvariantCulture);

@@ -15,20 +15,76 @@ namespace Plateia.Web.Controllers;
 /// <summary>Páginas abertas ao público: agenda, página do evento, inscrição, pagamento e ingresso.</summary>
 [AllowAnonymous]
 public class PublicoController(AppDbContext db, InscricaoService inscricoes, PagamentoService pagamentos, DivulgacaoService divulgacao,
-    ILogger<PublicoController> log) : BaseController
+    CatalogoService catalogo, ILogger<PublicoController> log) : BaseController
 {
-    [HttpGet("/agenda")]
-    public async Task<IActionResult> Agenda()
+    [HttpGet("/")]
+    public async Task<IActionResult> Inicio()
     {
-        var limite = DateTime.UtcNow.AddHours(-6);
-        var eventos = await db.Eventos.Include(e => e.Tipos)
-            .Where(e => e.Status == StatusEvento.Publicado && (e.FimEm ?? e.InicioEm) >= limite)
-            .OrderBy(e => e.InicioEm)
-            .Select(e => new { e.Slug, e.Titulo, e.Subtitulo, e.Local, e.InicioEm, e.Cor, e.Tipos, e.InscricoesAbertas,
-                Livres = e.Capacidade - e.Inscricoes.Count(i => i.Status == StatusInscricao.Confirmada) })
-            .ToListAsync();
-        return View(eventos.Select(e => new CartaoAgenda(e.Slug, e.Titulo, e.Subtitulo, e.Local, e.InicioEm, e.Cor,
-            Texto.APartirDe(e.Tipos), e.Livres, e.InscricoesAbertas)).ToList());
+        var (semanaDe, semanaAte) = Periodo("semana")!.Value;
+        return View(new PaginaInicio
+        {
+            Destaques = await catalogo.DestaquesAsync(),
+            EstaSemana = await catalogo.BuscarAsync(new FiltroBusca(DeUtc: semanaDe, AteUtc: semanaAte), 8),
+            Proximos = await catalogo.BuscarAsync(new FiltroBusca(), 12),
+            Online = await catalogo.BuscarAsync(new FiltroBusca(SoOnline: true), 4),
+            Categorias = await catalogo.CategoriasAsync(),
+            Cidades = await catalogo.CidadesAsync(),
+            Total = await catalogo.TotalAsync()
+        });
+    }
+
+    [HttpGet("/eventos")]
+    public async Task<IActionResult> Busca(string? q, string? categoria, string? cidade, string? quando, string? online, string? gratis)
+    {
+        var cat = Texto.CategoriaDoSlug(categoria);
+        var periodo = Periodo(quando);
+        var soOnline = online == "1";
+        var soGratis = gratis == "1";
+        return View(new PaginaBusca
+        {
+            Itens = await catalogo.BuscarAsync(new FiltroBusca(q, cat, cidade, periodo?.De, periodo?.Ate, soOnline, soGratis)),
+            Texto = q, Categoria = cat, Cidade = cidade, Quando = periodo is null ? null : quando, Online = soOnline, Gratis = soGratis,
+            Categorias = await catalogo.CategoriasAsync(), Cidades = await catalogo.CidadesAsync()
+        });
+    }
+
+    [HttpGet("/agenda")]
+    public IActionResult Agenda() => RedirectPermanent("/eventos");
+
+    [HttpGet("/p/{slug}")]
+    public async Task<IActionResult> Produtor(string slug)
+    {
+        var u = await db.Usuarios.FirstOrDefaultAsync(x => x.Slug == slug && x.Ativo && x.Aprovado);
+        if (u is null) return NotFound();
+        return View(new PaginaProdutor
+        {
+            Produtor = u,
+            Eventos = await catalogo.DoProdutorAsync(u.Id),
+            Realizados = await db.Eventos.CountAsync(e => e.OrganizadorId == u.Id && e.Status != StatusEvento.Rascunho && e.InicioEm < DateTime.UtcNow)
+        });
+    }
+
+    /// <summary>Converte "hoje", "fim-de-semana", "semana" e "mes" em intervalo UTC (no horário de Brasília).</summary>
+    static (DateTime De, DateTime Ate)? Periodo(string? quando)
+    {
+        var hoje = Hora.HojeLocal;
+        (DateTime, DateTime)? local = quando switch
+        {
+            "hoje" => (hoje, hoje.AddDays(1)),
+            "amanha" => (hoje.AddDays(1), hoje.AddDays(2)),
+            "fim-de-semana" => FimDeSemana(hoje),
+            "semana" => (hoje, hoje.AddDays(7)),
+            "mes" => (hoje, hoje.AddDays(30)),
+            _ => null
+        };
+        return local is { } l ? (Hora.ParaUtc(l.Item1), Hora.ParaUtc(l.Item2)) : null;
+
+        static (DateTime, DateTime) FimDeSemana(DateTime d)
+        {
+            var sabado = d.AddDays(((int)DayOfWeek.Saturday - (int)d.DayOfWeek + 7) % 7);
+            if (d.DayOfWeek == DayOfWeek.Sunday) sabado = d.AddDays(-1);
+            return (sabado < d ? d : sabado, sabado.AddDays(2));
+        }
     }
 
     [HttpGet("/e/{slug}")]
@@ -37,6 +93,7 @@ public class PublicoController(AppDbContext db, InscricaoService inscricoes, Pag
         var pagina = await Montar(slug);
         if (pagina is null) return NotFound();
         pagina.Canal = await RegistrarCanal(pagina, origem ?? utm);
+        pagina.Relacionados = await catalogo.RelacionadosAsync(pagina.Evento);
         return View(pagina);
     }
 
@@ -120,7 +177,7 @@ public class PublicoController(AppDbContext db, InscricaoService inscricoes, Pag
     Task<Inscricao?> Carregar(string codigo)
     {
         var c = Utilidades.NormalizarCodigo(codigo);
-        return db.Inscricoes.Include(x => x.Evento).Include(x => x.TipoIngresso).FirstOrDefaultAsync(x => x.Codigo == c);
+        return db.Inscricoes.Include(x => x.Evento).Include(x => x.TipoIngresso).ThenInclude(t => t!.Espaco).FirstOrDefaultAsync(x => x.Codigo == c);
     }
 
     /// <summary>
@@ -146,7 +203,7 @@ public class PublicoController(AppDbContext db, InscricaoService inscricoes, Pag
 
     async Task<PaginaEvento?> Montar(string slug)
     {
-        var e = await db.Eventos.Include(x => x.Tipos).Include(x => x.Organizador).FirstOrDefaultAsync(x => x.Slug == slug);
+        var e = await db.Eventos.Include(x => x.Tipos).Include(x => x.Espacos).Include(x => x.Organizador).FirstOrDefaultAsync(x => x.Slug == slug);
         if (e is null) return null;
 
         // Rascunho só aparece (como prévia) para o próprio organizador ou para o administrador.
@@ -162,7 +219,7 @@ public class PublicoController(AppDbContext db, InscricaoService inscricoes, Pag
         var resumo = await ResumoEvento.CarregarAsync(db, e);
         return new PaginaEvento
         {
-            Evento = e, Tipos = resumo.PorTipo.Where(t => t.Ativo).ToList(), Livres = resumo.Livres, Previa = previa,
+            Evento = e, Tipos = resumo.PorTipo.Where(t => t.Ativo).ToList(), Livres = resumo.Livres, Previa = previa, Espacos = resumo.PorEspaco,
             PagamentoOnline = pagamentos.Online, TemCupons = await db.Cupons.AnyAsync(c => c.EventoId == e.Id && c.Ativo)
         };
     }

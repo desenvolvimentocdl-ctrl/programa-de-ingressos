@@ -44,8 +44,11 @@
                 <div><dt>Participante</dt><dd>@Model.Nome</dd></div>
                 <div><dt>Pagamento</dt><dd><span class="pilula @Texto.ClassePagamento(Model.Pagamento)">@Texto.NomePagamento(Model.Pagamento)</span>@if (Model.Pagamento == StatusPagamento.Pago && Model.Valor > 0) { <span class="forma">@Hora.Dinheiro(Model.Valor)@(Model.FormaPagamento is { } fp ? $" · {fp}" : "")</span> }</dd></div>
                 <div><dt>Quando</dt><dd>@Hora.DataLonga(e.InicioEm)</dd></div>
-                <div><dt>Onde</dt><dd>@e.Local@(e.Endereco is { } end ? $" · {end}" : "")</dd></div>
+                <div><dt>Onde</dt><dd>@(e.Formato == FormatoEvento.Online ? "Online" : e.Local)@(e.Presencial && e.Endereco is { } end ? $" · {end}" : "")@(e.Presencial && e.CidadeUf.Length > 0 ? $" · {e.CidadeUf}" : "")</dd></div>
+                @if (Model.TipoIngresso?.Espaco is { } esp) { <div><dt>Espaço</dt><dd>@esp.Nome</dd></div> }
+                <div><dt>Ingresso</dt><dd>@Model.TipoIngresso?.Nome</dd></div>
             </dl>
+            @if (e.Presencial) { <a class="link-mapa" href="@Texto.LinkMapa(e)" target="_blank" rel="noopener" style="justify-self:center">Como chegar ↗</a> }
         </div>
     </article>
 
@@ -73,6 +76,14 @@
                 <span style="opacity:.75">Informe o código <b class="mono">@Model.Codigo</b> ao enviar o comprovante.</span>
             </div>
         }
+    }
+    @if (Model.Ativa && Model.Pagamento != StatusPagamento.Pendente && e.Formato != FormatoEvento.Presencial)
+    {
+        <div class="pagar-online">
+            <b>Transmissão</b>
+            @if (e.LinkOnline is { } lo) { <a class="btn" href="@lo" target="_blank" rel="noopener">Entrar na transmissão</a><small>O link é pessoal: não compartilhe.</small> }
+            else { <span style="font-size:14px;opacity:.85">O produtor vai liberar o link da transmissão aqui, perto do horário do evento.</span> }
+        </div>
     }
     @if (TempData["erro"] is string erroPg) { <div class="alerta-caixa erro" role="alert">@erroPg</div> }
 

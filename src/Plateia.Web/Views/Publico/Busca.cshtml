@@ -1,0 +1,49 @@
+@model PaginaBusca
+@{
+    Layout = "_LayoutPublico";
+    var titulo = Model.Categoria is { } cat ? Texto.NomeCategoria(cat) : Model.Cidade is { Length: > 0 } cid ? $"Eventos em {cid}" : !string.IsNullOrWhiteSpace(Model.Texto) ? $"“{Model.Texto}”" : "Explorar eventos";
+    ViewData["Title"] = titulo + " · Plateia";
+    ViewData["Descricao"] = "Eventos com inscrições abertas.";
+    var quandos = new[] { ("", "Qualquer data"), ("hoje", "Hoje"), ("amanha", "Amanhã"), ("fim-de-semana", "Fim de semana"), ("semana", "7 dias"), ("mes", "30 dias") };
+}
+<main class="vitrine busca-pagina">
+    <div class="cabeca-busca">
+        <h1 class="display">@titulo</h1>
+        <p class="suave">@Model.Itens.Count evento(s) encontrado(s)</p>
+    </div>
+    <div class="filtros-busca">
+        <div class="linha-filtro">
+            <span>Quando</span>
+            @foreach (var (k, n) in quandos)
+            {
+                <a href="@Model.Link(quando: k)" class="@((Model.Quando ?? "") == k ? "on" : "")">@n</a>
+            }
+        </div>
+        <div class="linha-filtro">
+            <span>Categoria</span>
+            <a href="@Model.Link(categoria: null)" class="@(Model.Categoria is null ? "on" : "")">Todas</a>
+            @foreach (var c in Enum.GetValues<CategoriaEvento>().Where(c => Model.Categorias.ContainsKey(c)))
+            {
+                <a href="@Model.Link(categoria: Texto.SlugCategoria(c))" class="@(Model.Categoria == c ? "on" : "")">@Texto.NomeCategoria(c)</a>
+            }
+        </div>
+        <div class="linha-filtro">
+            <span>Onde</span>
+            <a href="@Model.Link(cidade: null)" class="@(string.IsNullOrEmpty(Model.Cidade) ? "on" : "")">Todas</a>
+            @foreach (var (c, _) in Model.Cidades)
+            {
+                <a href="@Model.Link(cidade: c)" class="@(Model.Cidade == c ? "on" : "")">@c</a>
+            }
+            <a href="@Model.Link(online: !Model.Online)" class="@(Model.Online ? "on" : "")">Online</a>
+            <a href="@Model.Link(gratis: !Model.Gratis)" class="@(Model.Gratis ? "on" : "")">Só gratuitos</a>
+        </div>
+    </div>
+    @if (Model.Itens.Count == 0)
+    {
+        <div class="bilhete nada"><b class="display">Nada por aqui</b><p class="suave">Tente outra data, cidade ou categoria.</p><a class="btn" href="/eventos">Limpar filtros</a></div>
+    }
+    else
+    {
+        <div class="grade-pub">@foreach (var c in Model.Itens) { <partial name="_CartaoPublico" model="c" /> }</div>
+    }
+</main>

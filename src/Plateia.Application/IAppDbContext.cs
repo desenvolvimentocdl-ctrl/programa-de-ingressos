@@ -11,6 +11,7 @@ public interface IAppDbContext
     DbSet<TipoIngresso> TiposIngresso { get; }
     DbSet<Inscricao> Inscricoes { get; }
     DbSet<Cupom> Cupons { get; }
+    DbSet<EspacoEvento> Espacos { get; }
     DbSet<VisitaEvento> Visitas { get; }
     DatabaseFacade Database { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);

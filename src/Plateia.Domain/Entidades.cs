@@ -12,8 +12,28 @@ public class Usuario
     public string SenhaHash { get; set; } = "";
     public Perfil Perfil { get; set; }
     public bool Ativo { get; set; } = true;
+    /// <summary>Produtores que se cadastram sozinhos só publicam eventos depois da aprovação do administrador.</summary>
+    public bool Aprovado { get; set; } = true;
     public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
+
+    // Perfil público do produtor (página /p/{slug}).
+    public string? NomePublico { get; set; }
+    public string? Slug { get; set; }
+    public string? Bio { get; set; }
+    public string? Instagram { get; set; }
+    public string? Site { get; set; }
+    public string? Cidade { get; set; }
+
+    public string NomeExibicao => string.IsNullOrWhiteSpace(NomePublico) ? Nome : NomePublico!;
 }
+
+public enum CategoriaEvento
+{
+    Negocios = 0, Cursos = 1, Tecnologia = 2, Marketing = 3, Saude = 4, Gastronomia = 5,
+    Musica = 6, ArteCultura = 7, Esportes = 8, Infantil = 9, Networking = 10, Outros = 99
+}
+
+public enum FormatoEvento { Presencial = 0, Online = 1, Hibrido = 2 }
 
 /// <summary>Rascunho não aparece para o público; Publicado aceita inscrições (se abertas); Encerrado e Cancelado só mostram a página.</summary>
 public enum StatusEvento { Rascunho = 0, Publicado = 1, Encerrado = 2, Cancelado = 3 }
@@ -25,8 +45,23 @@ public class Evento
     public string Slug { get; set; } = "";
     public string? Subtitulo { get; set; }
     public string? Descricao { get; set; }
+    public CategoriaEvento Categoria { get; set; } = CategoriaEvento.Negocios;
+    public FormatoEvento Formato { get; set; }
+    /// <summary>Nome do lugar (ex.: "Teatro Municipal") ou "Online".</summary>
     public string Local { get; set; } = "";
     public string? Endereco { get; set; }
+    public string? Bairro { get; set; }
+    public string? Cidade { get; set; }
+    public string? Uf { get; set; }
+    public string? Cep { get; set; }
+    /// <summary>Link da transmissão (só aparece no ingresso de quem está confirmado e em dia).</summary>
+    public string? LinkOnline { get; set; }
+    /// <summary>"Livre", "12+", "16+", "18+".</summary>
+    public string? Classificacao { get; set; }
+    /// <summary>Caminho da imagem de capa enviada pelo produtor (vazio = capa gerada com a cor).</summary>
+    public string? Imagem { get; set; }
+    /// <summary>Aparece em destaque na página inicial (decisão do administrador).</summary>
+    public bool Destaque { get; set; }
     /// <summary>Gravado em UTC.</summary>
     public DateTime InicioEm { get; set; }
     public DateTime? FimEm { get; set; }
@@ -44,8 +79,26 @@ public class Evento
     public List<TipoIngresso> Tipos { get; set; } = new();
     public List<Inscricao> Inscricoes { get; set; } = new();
     public List<Cupom> Cupons { get; set; } = new();
+    public List<EspacoEvento> Espacos { get; set; } = new();
 
     public bool Visivel => Status != StatusEvento.Rascunho;
+    public bool Presencial => Formato != FormatoEvento.Online;
+    public string CidadeUf => string.Join("/", new[] { Cidade, Uf }.Where(x => !string.IsNullOrWhiteSpace(x)));
+}
+
+/// <summary>
+/// Espaço do evento definido pelo produtor (ex.: "Plateia", "Mezanino", "Sala de workshop", "Área VIP"),
+/// cada um com a sua lotação. Os tipos de ingresso ficam ligados a um espaço.
+/// </summary>
+public class EspacoEvento
+{
+    public int Id { get; set; }
+    public int EventoId { get; set; }
+    public Evento? Evento { get; set; }
+    public string Nome { get; set; } = "";
+    public string? Descricao { get; set; }
+    public int Capacidade { get; set; }
+    public int Ordem { get; set; }
 }
 
 public class TipoIngresso
@@ -60,6 +113,8 @@ public class TipoIngresso
     public int? Quantidade { get; set; }
     public int Ordem { get; set; }
     public bool Ativo { get; set; } = true;
+    public int? EspacoId { get; set; }
+    public EspacoEvento? Espaco { get; set; }
     /// <summary>Fim das vendas deste tipo (ex.: "1º lote até 10/12"). Gravado em UTC; vazio = até o evento.</summary>
     public DateTime? VendasAte { get; set; }
 

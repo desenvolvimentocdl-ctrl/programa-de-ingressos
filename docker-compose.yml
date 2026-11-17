@@ -1,0 +1,39 @@
+# DEMONSTRAÇÃO LOCAL do Plateia: sobe um MySQL e o sistema já com eventos de teste FICTÍCIOS.
+#   docker compose up --build      →  abra http://localhost:8080
+# As senhas abaixo são só para esta demonstração na sua máquina. Em produção, use as variáveis
+# de ambiente do servidor (veja .env.exemplo) e um banco com usuário próprio (banco/criar-banco.sql).
+services:
+  banco:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: demo_root_local
+      MYSQL_DATABASE: Plateia
+      MYSQL_USER: plateia
+      MYSQL_PASSWORD: demo_plateia_local
+    volumes:
+      - banco:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pdemo_root_local"]
+      interval: 5s
+      retries: 30
+
+  plateia:
+    build: .
+    depends_on:
+      banco:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      ConnectionStrings__Plateia: "Server=banco;Database=Plateia;User=plateia;Password=demo_plateia_local"
+      Admin__Nome: "Administrador"
+      Admin__Email: "admin@plateia.local"
+      Admin__Senha: "admin12345"
+      Demo__Criar: "true"
+      TZ: "America/Sao_Paulo"
+    volumes:
+      - uploads:/dados/uploads
+
+volumes:
+  banco:
+  uploads:

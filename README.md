@@ -1,16 +1,40 @@
 # Plateia
 
-Sistema de ingressos para palestrantes e representantes que fazem eventos na casa.
-O organizador acompanha quem confirmou, quem pagou e quem entrou, divulga o evento com links e artes prontas; o público se inscreve por uma página própria, paga pela **Cielo** (cartão ou Pix) e recebe um ingresso com QR code.
+Plataforma de eventos e ingressos: **qualquer produtor** (palestrante, empresa, coletivo, produtora) cria a conta, monta o evento
+com o próprio local e espaços, vende ingressos com pagamento pela **Cielo**, divulga e faz o check-in. O público encontra os
+eventos numa vitrine com busca por cidade, data e categoria e recebe o ingresso com QR code na hora.
 
 Mesma tecnologia dos outros sistemas: **C# / .NET 8, ASP.NET Core MVC, Entity Framework Core 8 e MySQL 8 (Pomelo)**. CSS e JS sem bibliotecas.
 
-![Painel do evento](docs/telas/03-painel.png)
+![Vitrine](docs/telas/30-inicio.png)
+
+## Ver funcionando agora (eventos de teste)
+
+Com Docker instalado:
+
+```bash
+docker compose up --build
+```
+
+Abra **http://localhost:8080**. O banco já vem com produtores, eventos, inscrições e pagamentos **fictícios**:
+
+| Acesso | E-mail | Senha |
+|---|---|---|
+| Administrador (aprova produtores, vê tudo) | `admin@plateia.local` | `admin12345` |
+| Produtora "Marina Duarte Treinamentos" | `demo@plateia.local` | `demo12345` |
+| Outros produtores de teste | `fermento@exemplo.com`, `hub@exemplo.com`, `movimento@exemplo.com`, `palco@exemplo.com` | `demo12345` |
+| Produtor aguardando aprovação | `atelie@exemplo.com` | `demo12345` |
+
+Sem Docker: rode como em "Rodar localmente" com `Demo__Criar=true` e um banco vazio.
+Para recomeçar do zero: `docker compose down -v`.
 
 ## O que já faz
 
 | Área | Funções |
 |---|---|
+| **Vitrine pública** `/` | Busca (o quê, onde, quando), categorias, eventos em destaque, "nesta semana", por cidade, online; filtros por data, categoria, cidade, online e gratuitos em `/eventos`. |
+| **Produtores** | Cadastro próprio em `/criar-conta` (fica "em análise" até o administrador aprovar; antes disso só cria rascunhos). Perfil público em `/p/{produtor}` com bio, Instagram, site e eventos. |
+| **Local e espaços** | Presencial, online ou híbrido; nome do local, endereço, bairro, cidade/UF e link "Como chegar"; link da transmissão (só no ingresso de quem está em dia). Espaços com lotação própria (ex.: Pista 150, Mesas 48) e cada ingresso ligado a um espaço. Capa com imagem enviada pelo produtor (ou capa gerada com a cor). Categoria e classificação etária. |
 | **Meus eventos** | Cartões no formato de ingresso com capacidade, confirmados, pagos e a receber; filtros Próximos / Rascunhos / Passados; duplicar evento (para edições que se repetem) e excluir (só sem inscrições). |
 | **Venda (Cielo)** | Cada inscrição paga ganha um Link de Pagamento da Cielo. A pessoa paga na página segura da Cielo (crédito, débito ou Pix, conforme a conta) e o ingresso vira "Pago" sozinho pela notificação. Nenhum dado de cartão passa pelo Plateia. |
 | **Lotes e cupons** | Vários tipos de ingresso com data limite de venda ("1º lote até…"); cupons de desconto em % ou R$, com limite de usos e validade. |
@@ -23,7 +47,7 @@ Mesma tecnologia dos outros sistemas: **C# / .NET 8, ASP.NET Core MVC, Entity Fr
 | **Ingresso** `/ingresso/{código}` | QR code, código, situação do pagamento com instruções (PIX), adicionar à agenda (.ics), imprimir. |
 | **Organizadores (administrador)** | Criar acesso com senha temporária, gerar nova senha, desativar. |
 
-**Perfis:** Organizador vê só os próprios eventos · Administrador vê todos e cadastra organizadores.
+**Perfis:** Produtor vê só os próprios eventos · Administrador vê todos, aprova produtores e escolhe os destaques da vitrine.
 
 **Pagamento:** pela Cielo quando as credenciais estão configuradas; sem elas, o ingresso mostra as instruções manuais (PIX etc.) e o organizador marca como pago. As duas formas convivem: o organizador sempre pode marcar pagamentos feitos em dinheiro ou na secretaria.
 
@@ -74,7 +98,8 @@ Nada de senha no código: tudo vem de variáveis de ambiente (veja `.env.exemplo
 | `Cielo__ClientId`, `Cielo__ClientSecret` | Credenciais do Link de Pagamento da Cielo. Sem elas, o pagamento fica manual. |
 | `Cielo__ChaveNotificacao` | Senha que vai no fim das URLs de notificação (protege o endereço de avisos). |
 | `Cielo__SoftDescriptor`, `Cielo__MaxParcelas` | Nome na fatura do cartão (até 13 letras) e parcelas máximas (padrão 1). |
-| `Demo__Criar` | `true` cria eventos e participantes fictícios (só se não houver eventos). Use apenas para demonstração. |
+| `Uploads__Pasta` | Onde ficam as capas enviadas (padrão `dados/uploads` ao lado do sistema). Faça backup dessa pasta junto com o banco. |
+| `Demo__Criar` | `true` cria produtores, eventos e participantes fictícios (só se não houver eventos). Use apenas para demonstração. |
 
 ## Rodar localmente
 
@@ -93,7 +118,8 @@ Com `Demo__Criar=true`, entre também como organizador de exemplo: `demo@plateia
 - Inscrição trava a linha do evento durante a contagem: dois pedidos simultâneos não ocupam o mesmo último lugar.
 - Mesmo e-mail não se inscreve duas vezes no mesmo evento pelo site.
 - Limite de 10 envios por minuto por IP no login e na inscrição; antiforgery em todos os formulários.
-- Organizador só acessa os próprios eventos (os outros respondem 404).
+- Produtor só acessa os próprios eventos (os outros respondem 404); cadastro novo só publica depois de aprovado.
+- Capas enviadas: só JPG/PNG/WEBP conferidos pelos primeiros bytes, até 4 MB, com nome aleatório.
 - Planilha exportada protegida contra fórmulas do Excel.
 - Endereço de avisos da Cielo exige a chave secreta e confere tudo na API da Cielo antes de dar baixa.
 
@@ -108,6 +134,6 @@ ConnectionStrings__Plateia="Server=localhost;Database=Plateia;User=x;Password=x"
 
 ## Telas
 
-| Página pública (cupom e lotes) | Ingresso com pagamento Cielo | Divulgação |
+| Página do evento (espaços) | Ingresso com pagamento Cielo | Divulgação |
 |---|---|---|
-| ![](docs/telas/07-publico.png) | ![](docs/telas/08-ingresso.png) | ![](docs/telas/09-divulgacao.png) |
+| ![](docs/telas/32-evento-espacos.png) | ![](docs/telas/08-ingresso.png) | ![](docs/telas/09-divulgacao.png) |

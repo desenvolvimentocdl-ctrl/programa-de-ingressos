@@ -15,8 +15,9 @@ namespace Plateia.Web.Controllers;
 public class OrganizadoresController(AppDbContext db, IPasswordHasher<Usuario> hasher) : BaseController
 {
     [HttpGet("/organizadores")]
-    public async Task<IActionResult> Index() => View(await db.Usuarios.OrderByDescending(u => u.Ativo).ThenBy(u => u.Nome)
-        .Select(u => new OrganizadorLinha(u.Id, u.Nome, u.Email, u.Telefone, u.Perfil, u.Ativo, db.Eventos.Count(e => e.OrganizadorId == u.Id)))
+    public async Task<IActionResult> Index() => View(await db.Usuarios.OrderBy(u => u.Aprovado).ThenByDescending(u => u.Ativo).ThenBy(u => u.Nome)
+        .Select(u => new OrganizadorLinha(u.Id, u.Nome, u.Email, u.Telefone, u.Perfil, u.Ativo, db.Eventos.Count(e => e.OrganizadorId == u.Id),
+            u.Aprovado, u.NomePublico, u.Slug, u.Cidade))
         .ToListAsync());
 
     [HttpPost("/organizadores")]
@@ -28,6 +29,7 @@ public class OrganizadoresController(AppDbContext db, IPasswordHasher<Usuario> h
         if (await db.Usuarios.AnyAsync(u => u.Email == e)) throw new RegraNegocioException("Já existe um acesso com este e-mail.");
 
         var u = new Usuario { Nome = n, Email = e, Telefone = Utilidades.SoDigitos(telefone), Perfil = perfil };
+        u.Slug = await ContaController.SlugProdutorAsync(db, n);
         var senha = SenhaTemporaria();
         u.SenhaHash = hasher.HashPassword(u, senha);
         db.Usuarios.Add(u);
@@ -46,6 +48,16 @@ public class OrganizadoresController(AppDbContext db, IPasswordHasher<Usuario> h
         await db.SaveChangesAsync();
         TempData["senha"] = $"{u.Email}|{senha}";
         return Redirect("/organizadores");
+    }
+
+    [HttpPost("/organizadores/{id:int}/aprovar")]
+    public async Task<IActionResult> Aprovar(int id)
+    {
+        var u = await db.Usuarios.FirstOrDefaultAsync(x => x.Id == id);
+        if (u is null) return NotFound();
+        u.Aprovado = true;
+        await db.SaveChangesAsync();
+        return VoltarCom($"{u.NomeExibicao} aprovado(a): já pode publicar eventos.");
     }
 
     [HttpPost("/organizadores/{id:int}/ativo")]

@@ -5,7 +5,7 @@
     ViewData["Title"] = e.Titulo;
     ViewData["Cor"] = e.Cor;
     ViewData["Descricao"] = e.Subtitulo ?? $"{Hora.DataLonga(e.InicioEm)} · {e.Local}";
-    ViewData["LinkMarca"] = "/agenda";
+    if (e.Imagem is { } img) ViewData["ImagemOg"] = $"{Context.Request.Scheme}://{Context.Request.Host}{img}";
     var local = Hora.Local(e.InicioEm);
     var form = ViewBag.Form as dynamic;
     int? tipoEscolhido = form?.tipo;
@@ -14,18 +14,23 @@
     var poucas = Model.Livres <= Math.Max(5, e.Capacidade * 0.2);
     var temPago = disponiveis.Any(t => t.Preco > 0);
     string? cupomDigitado = form?.cupom;
+    var espacoLotado = Model.Espacos.Where(x => x.Livres <= 0).Select(x => x.Id).ToHashSet();
+    // Ingressos agrupados por espaço (sem espaços, um grupo só).
+    var grupos = Model.Espacos.Count == 0
+        ? new List<(ResumoEspaco? Espaco, List<ResumoTipo> Tipos)> { (null, Model.Tipos) }
+        : Model.Espacos.Select(x => ((ResumoEspaco?)x, Model.Tipos.Where(t => t.EspacoId == x.Id).ToList())).Where(g => g.Item2.Count > 0).ToList();
+    var produtor = e.Organizador;
 }
 @section Topo {
     @if (Model.Previa) { <div class="aviso-previa">Prévia: este evento está em rascunho e só você consegue ver esta página.</div> }
 }
-@section TopoDireita {
-    <a class="btn fantasma peq" href="/agenda">Ver agenda</a>
-}
 
-<section class="cartaz hero-evento" style="--cor:@e.Cor;--tinta:@Texto.TintaSobre(e.Cor)">
+<section class="hero-evento @(e.Imagem is null ? "cartaz" : "com-imagem")" style="--cor:@e.Cor;--tinta:@Texto.TintaSobre(e.Cor)">
+    @if (e.Imagem is { } capa) { <img class="hero-img" src="@capa" alt=""> }
     <div class="chips">
+        <span>@Texto.NomeCategoria(e.Categoria)</span>
         <span>@Hora.Data(e.InicioEm)</span>
-        <span>@e.Local</span>
+        <span>@(e.Formato == FormatoEvento.Online ? "Online" : e.CidadeUf.Length > 0 ? e.CidadeUf : e.Local)</span>
         @if (e.Status == StatusEvento.Cancelado) { <span>Cancelado</span> }
     </div>
     <h1 class="display">@e.Titulo</h1>
@@ -37,29 +42,71 @@
         <div class="fatos">
             <div class="fato">
                 <div class="dia"><small>@local.ToString("MMM", Hora.PtBr).TrimEnd('.')</small><b>@local.Day</b></div>
-                <div><strong>@local.ToString("dddd", Hora.PtBr)</strong><p>@local.ToString("HH:mm")@(e.FimEm is { } f ? " às " + Hora.Local(f).ToString("HH:mm") : "")</p></div>
+                <div><strong>@local.ToString("dddd", Hora.PtBr)</strong><p>@local.ToString("HH:mm")@(e.FimEm is { } f ? " às " + Hora.Local(f).ToString(Hora.Local(f).Date == local.Date ? "HH:mm" : "dd/MM HH:mm") : "")</p></div>
             </div>
+            @if (e.Presencial)
+            {
+                <div class="fato">
+                    <div class="dia icone" aria-hidden="true">⌖</div>
+                    <div>
+                        <strong>@e.Local</strong>
+                        <p>@string.Join(" · ", new[] { e.Endereco, e.Bairro, e.CidadeUf }.Where(x => !string.IsNullOrWhiteSpace(x)))</p>
+                        <a class="link-mapa" href="@Texto.LinkMapa(e)" target="_blank" rel="noopener">Como chegar ↗</a>
+                    </div>
+                </div>
+            }
+            @if (e.Formato != FormatoEvento.Presencial)
+            {
+                <div class="fato">
+                    <div class="dia icone" aria-hidden="true">◉</div>
+                    <div><strong>@(e.Formato == FormatoEvento.Online ? "Evento online" : "Também online")</strong><p>O link da transmissão aparece no seu ingresso.</p></div>
+                </div>
+            }
             <div class="fato">
-                <div class="dia" style="display:grid;place-items:center;font-size:22px" aria-hidden="true">⌖</div>
-                <div><strong>@e.Local</strong><p>@(e.Endereco ?? "Endereço no ingresso")</p></div>
+                <div class="dia icone" aria-hidden="true">@(e.Classificacao == "Livre" || e.Classificacao is null ? "L" : e.Classificacao.TrimEnd('+'))</div>
+                <div><strong>Classificação</strong><p>@(e.Classificacao is null or "Livre" ? "Livre para todos os públicos" : $"A partir de {e.Classificacao.TrimEnd('+')} anos")</p></div>
             </div>
         </div>
+
         @if (e.Descricao is { } d)
         {
             <div>
-                <h2>Sobre</h2>
+                <h2>Sobre o evento</h2>
                 <p class="texto" style="margin-top:14px">@d</p>
             </div>
         }
-        @if (e.Organizador is { } o)
+
+        @if (Model.Espacos.Count > 0)
         {
-            <div class="organiza"><span class="av" style="background:var(--sup-3);color:var(--texto)">@Texto.Iniciais(o.Nome)</span><div><span>Organização</span><b>@o.Nome</b></div></div>
+            <div>
+                <h2>Espaços</h2>
+                <div class="espacos-pub">
+                    @foreach (var x in Model.Espacos)
+                    {
+                        var ocup = x.Capacidade == 0 ? 1 : Math.Min(1, x.Ocupados / (double)x.Capacidade);
+                        <div class="espaco-pub">
+                            <div><b>@x.Nome</b>@if (x.Descricao is { } xd) { <p>@xd</p> }</div>
+                            <span class="@(x.Livres <= 0 ? "esgotado-txt" : "")">@(x.Livres <= 0 ? "Esgotado" : ocup >= .8 ? $"Últimos {x.Livres} lugares" : $"{x.Capacidade} lugares")</span>
+                            <div class="barra"><i style="--v:@Texto.N(ocup);--c:var(--cor)"></i></div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (produtor is not null)
+        {
+            <a class="organiza" href="@(produtor.Slug is { } ps && produtor.Aprovado ? $"/p/{ps}" : "#")">
+                <span class="av" style="background:var(--sup-3);color:var(--texto)">@Texto.Iniciais(produtor.NomeExibicao)</span>
+                <div><span>Produzido por</span><b>@produtor.NomeExibicao</b>@if (produtor.Bio is { } bio) { <small>@(bio.Length > 140 ? bio[..140] + "…" : bio)</small> }</div>
+                <span class="seta">Ver perfil →</span>
+            </a>
         }
     </div>
 
     <aside class="compra" id="inscricao">
         <div class="bilhete">
-            <div class="topo-compra"><b>Garanta seu lugar</b><span class="mono" style="font-size:13px">Nº @Texto.Numero(e.Id)</span></div>
+            <div class="topo-compra"><b>Ingressos</b><span class="mono" style="font-size:13px">Nº @Texto.Numero(e.Id)</span></div>
             <div class="picote" style="margin:0 18px"></div>
             @if (Model.AceitaInscricoes && disponiveis.Count > 0)
             {
@@ -68,23 +115,27 @@
                     @if (poucas) { <span class="restam">🔥 Restam @Model.Livres lugar(es)</span> }
                     <fieldset class="opcoes" style="border:0;padding:0;margin:0">
                         <legend class="sr">Tipo de ingresso</legend>
-                        @foreach (var t in Model.Tipos)
+                        @foreach (var (esp, tipos) in grupos)
                         {
-                            var fora = t.Esgotado || t.Encerrado;
-                            <label class="opcao @(fora ? "esgotado" : "")">
-                                <input type="radio" name="tipo" value="@t.Id" required checked="@(t.Id == tipoEscolhido ? "checked" : null)" disabled="@(fora ? "disabled" : null)">
-                                <span>
-                                    <b>@t.Nome</b>
-                                    @if (t.Esgotado) { <small>Esgotado</small> }
-                                    else if (t.Encerrado) { <small>Vendas encerradas</small> }
-                                    else
-                                    {
-                                        @if (t.Descricao is { } td) { <small>@td</small> }
-                                        @if (t.VendasAte is { } ate) { <span class="lote">até @Hora.Local(ate).ToString("dd/MM 'às' HH'h'mm")</span> }
-                                    }
-                                </span>
-                                <span class="preco" data-preco="@Texto.N((double)t.Preco)">@Texto.Preco(t.Preco)</span>
-                            </label>
+                            @if (esp is not null) { <p class="grupo-espaco">@esp.Nome</p> }
+                            @foreach (var t in tipos)
+                            {
+                                var fora = t.Esgotado || t.Encerrado || (t.EspacoId is { } eid && espacoLotado.Contains(eid));
+                                <label class="opcao @(fora ? "esgotado" : "")">
+                                    <input type="radio" name="tipo" value="@t.Id" required checked="@(t.Id == tipoEscolhido && !fora ? "checked" : null)" disabled="@(fora ? "disabled" : null)">
+                                    <span>
+                                        <b>@t.Nome</b>
+                                        @if (t.Esgotado || (t.EspacoId is { } e2 && espacoLotado.Contains(e2))) { <small>Esgotado</small> }
+                                        else if (t.Encerrado) { <small>Vendas encerradas</small> }
+                                        else
+                                        {
+                                            @if (t.Descricao is { } td) { <small>@td</small> }
+                                            @if (t.VendasAte is { } ate) { <span class="lote">até @Hora.Local(ate).ToString("dd/MM 'às' HH'h'mm")</span> }
+                                        }
+                                    </span>
+                                    <span class="preco" data-preco="@Texto.N((double)t.Preco)">@Texto.Preco(t.Preco)</span>
+                                </label>
+                            }
                         }
                     </fieldset>
                     <label class="campo">Nome completo<input name="nome" value="@form?.nome" required maxlength="160" autocomplete="name"></label>
@@ -115,10 +166,19 @@
             else
             {
                 <div class="fechado">
-                    <b>@(e.Status switch { StatusEvento.Encerrado => "Evento encerrado", StatusEvento.Cancelado => "Evento cancelado", _ => Model.Livres <= 0 || Model.Tipos.All(t => t.Esgotado) ? "Lotado" : "Inscrições fechadas" })</b>
-                    <p class="suave">@(e.Status == StatusEvento.Encerrado ? "Obrigado a quem participou!" : "Fale com a organização para saber se abrirão novas vagas.")</p>
+                    <b>@(e.Status switch { StatusEvento.Encerrado => "Evento encerrado", StatusEvento.Cancelado => "Evento cancelado", _ => Model.Livres <= 0 || Model.Tipos.All(t => t.Esgotado) ? "Esgotado" : "Inscrições fechadas" })</b>
+                    <p class="suave">@(e.Status == StatusEvento.Encerrado ? "Obrigado a quem participou!" : "Fale com o produtor para saber se abrirão novas vagas.")</p>
                 </div>
             }
         </div>
+        <button class="btn compartilhar-evento" type="button" data-compartilhar="@($"{Context.Request.Scheme}://{Context.Request.Host}/e/{e.Slug}")" data-titulo="@e.Titulo">Compartilhar evento</button>
     </aside>
 </div>
+
+@if (Model.Relacionados.Count > 0)
+{
+    <section class="vitrine" style="padding-top:0">
+        <div class="faixa-topo"><h2 class="display">Você também pode gostar</h2></div>
+        <div class="grade-pub">@foreach (var c in Model.Relacionados) { <partial name="_CartaoPublico" model="c" /> }</div>
+    </section>
+}
