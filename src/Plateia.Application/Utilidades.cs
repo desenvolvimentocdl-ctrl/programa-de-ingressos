@@ -43,6 +43,14 @@ public static partial class Utilidades
 
     public static string? Limpo(string? t, int max) => string.IsNullOrWhiteSpace(t) ? null : (t.Trim().Length > max ? t.Trim()[..max] : t.Trim());
 
+    /// <summary>CPF com 11 dígitos e dígitos verificadores corretos.</summary>
+    public static bool CpfValido(string? cpf)
+    {
+        if (cpf is not { Length: 11 } || !cpf.All(char.IsDigit) || cpf.Distinct().Count() == 1) return false;
+        int Dv(int n) { var s = 0; for (var i = 0; i < n; i++) s += (cpf[i] - '0') * (n + 1 - i); var r = s * 10 % 11; return r == 10 ? 0 : r; }
+        return Dv(9) == cpf[9] - '0' && Dv(10) == cpf[10] - '0';
+    }
+
     public static bool EmailValido(string? e) => e is not null && EmailRegex().IsMatch(e);
 
     public static bool CorValida(string? c) => c is not null && CorRegex().IsMatch(c);

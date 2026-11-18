@@ -191,6 +191,178 @@
         try { await navigator.clipboard.writeText(v); aviso("Mensagem copiada."); } catch { prompt("Copie:", v); }
     });
 
+    // ---------- Página pública: checkout (vários ingressos, um por participante; inteira ou meia) ----------
+    let cupomAtual = null;              // { tipo: "Percentual" | "Valor", valor } quando há cupom válido
+    let recalcularCheckout = () => { };
+    const formCk = $("#form-inscricao.checkout");
+    if (formCk) {
+        const maxPedido = +formCk.dataset.max || 10;
+        const maxTotal = Math.min(maxPedido, +formCk.dataset.livres || maxPedido);
+        const linhas = $$(".opcao.qtd", formCk);
+        const chave = (tipo, meia) => `${tipo}-${meia ? 1 : 0}`;
+        const linha = p => linhas.find(o => o.dataset.tipo == p.tipo && (o.dataset.meia === "1") === !!p.meia);
+        const ordem = p => linhas.indexOf(linha(p));
+        const maxDoTipo = tipo => +(linhas.find(o => o.dataset.tipo == tipo)?.dataset.max || 0);
+        const lista = $("[data-participantes]", formCk), bloco = $("[data-participantes-bloco]", formCk);
+        const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+        const fmt = v => brl.format(v).replace(",00", "");
+        let estado = [];
+        try { estado = (JSON.parse(formCk.dataset.estado || "{}").participantes || []).filter(p => linha(p) && maxDoTipo(p.tipo) > 0); } catch { }
+        if (estado.length && !estado.some(p => p.meu)) estado[0].meu = true;
+
+        const qtdLinha = (tipo, meia) => estado.filter(p => chave(p.tipo, p.meia) === chave(tipo, meia)).length;
+        const qtdTipo = tipo => estado.filter(p => p.tipo == tipo).length;
+        const precoFinal = p => {
+            const base = +linha(p).dataset.valor;
+            if (!cupomAtual || base <= 0) return base;
+            const desc = Math.min(base, cupomAtual.tipo === "Percentual" ? base * cupomAtual.valor / 100 : cupomAtual.valor);
+            return Math.round((base - desc) * 100) / 100;
+        };
+
+        // Guarda o que já foi digitado antes de redesenhar a lista.
+        const lerTela = () => $$(".participante", lista).forEach((f, i) => {
+            const p = estado[i]; if (!p) return;
+            p.nome = $("[data-campo=nome]", f).value; p.email = $("[data-campo=email]", f).value;
+            p.telefone = $("[data-campo=telefone]", f).value; p.meu = $("[data-meu]", f).checked;
+        });
+
+        const campo = (rotulo, nome, i, attrs) => {
+            const l = document.createElement("label");
+            l.className = "campo";
+            l.innerHTML = `${rotulo}<input data-campo="${nome}" name="p[${i}].${nome[0].toUpperCase() + nome.slice(1)}" ${attrs}>`;
+            return l;
+        };
+        const oculto = (nome, valor) => { const h = document.createElement("input"); h.type = "hidden"; h.name = nome; h.value = valor; return h; };
+
+        function desenhar() {
+            lista.replaceChildren();
+            const contagem = {};
+            estado.forEach((p, i) => {
+                const k = chave(p.tipo, p.meia);
+                contagem[k] = (contagem[k] || 0) + 1;
+                const f = document.createElement("fieldset");
+                f.className = "participante";
+                const lg = document.createElement("legend");
+                const titulo = document.createElement("span");
+                titulo.textContent = `Ingresso ${i + 1} · ${linha(p).dataset.nome}` + (qtdLinha(p.tipo, p.meia) > 1 ? ` (${contagem[k]})` : "");
+                const valor = document.createElement("small");
+                valor.className = "valor-ing";
+                lg.append(titulo, valor);
+
+                const meu = document.createElement("label");
+                meu.className = "check";
+                meu.innerHTML = `<input type="checkbox" data-meu name="p[${i}].Meu" value="true"> Este ingresso é meu (usa os meus dados)`;
+
+                const campos = document.createElement("div");
+                campos.className = "campos";
+                const dupla = document.createElement("div");
+                dupla.className = "linha2";
+                dupla.append(
+                    campo('E-mail <small>opcional</small>', "email", i, 'type="email" maxlength="180" autocomplete="off"'),
+                    campo('WhatsApp <small>opcional</small>', "telefone", i, 'inputmode="tel" autocomplete="off"'));
+                campos.append(campo("Nome completo do participante", "nome", i, 'maxlength="160" autocomplete="off"'), dupla);
+
+                f.append(lg, oculto(`p[${i}].TipoId`, p.tipo), oculto(`p[${i}].Meia`, p.meia ? "true" : "false"), meu, campos);
+                if (p.meia) {
+                    const av = document.createElement("small");
+                    av.className = "aviso-meia";
+                    av.textContent = "Meia-entrada: o participante apresenta o documento que dá direito à meia na entrada.";
+                    f.append(av);
+                }
+                lista.append(f);
+                $("[data-campo=nome]", f).value = p.nome || "";
+                $("[data-campo=email]", f).value = p.email || "";
+                $("[data-campo=telefone]", f).value = p.telefone || "";
+                const caixa = $("[data-meu]", f);
+                caixa.checked = !!p.meu;
+                const exigir = () => $("[data-campo=nome]", f).required = !caixa.checked;
+                exigir();
+                caixa.addEventListener("change", () => {
+                    // Só um ingresso pode ser "meu".
+                    if (caixa.checked) $$("[data-meu]", lista).forEach(o => { if (o !== caixa && o.checked) { o.checked = false; o.dispatchEvent(new Event("change")); } });
+                    exigir();
+                    if (!caixa.checked) $("[data-campo=nome]", f).focus();
+                });
+            });
+            bloco.hidden = estado.length === 0;
+            atualizar();
+        }
+
+        function atualizar() {
+            const total = estado.length;
+            linhas.forEach(o => {
+                const out = $("output", o);
+                if (!out) return;
+                const tipo = o.dataset.tipo, meia = o.dataset.meia === "1", n = qtdLinha(tipo, meia);
+                out.textContent = n;
+                o.classList.toggle("marcada", n > 0);
+                $("[data-menos]", o).disabled = n === 0;
+                $("[data-mais]", o).disabled = qtdTipo(tipo) >= maxDoTipo(tipo) || total >= maxTotal;
+            });
+            const valor = estado.reduce((s, p) => s + precoFinal(p), 0);
+            $$(".participante .valor-ing", lista).forEach((s, i) => { const v = precoFinal(estado[i]); s.textContent = v <= 0 ? "Gratuito" : fmt(v); });
+            const caixaTotal = $("[data-total]", formCk), botao = $("[data-finalizar]", formCk);
+            caixaTotal.hidden = total === 0;
+            $("[data-total-qtd]", formCk).textContent = total === 1 ? "1 ingresso" : `${total} ingressos`;
+            $("[data-total-valor]", formCk).textContent = valor <= 0 ? "Gratuito" : fmt(valor);
+            botao.disabled = total === 0;
+            botao.textContent = total === 0 ? "Escolha os ingressos"
+                : valor > 0 ? `Comprar ${total === 1 ? "1 ingresso" : total + " ingressos"} · ${fmt(valor)}`
+                : total === 1 ? "Confirmar inscrição" : `Confirmar ${total} inscrições`;
+        }
+        recalcularCheckout = atualizar;
+
+        linhas.forEach(o => {
+            const tipo = +o.dataset.tipo, meia = o.dataset.meia === "1";
+            $("[data-mais]", o)?.addEventListener("click", () => {
+                lerTela();
+                const novo = { tipo, meia, meu: !estado.some(p => p.meu) };
+                estado.push(novo);
+                estado.sort((a, b) => ordem(a) - ordem(b));
+                desenhar();
+                // Leva o foco para o novo participante (quando não é o próprio comprador).
+                const f = $$(".participante", lista)[estado.indexOf(novo)];
+                if (f && !$("[data-meu]", f).checked) $("[data-campo=nome]", f).focus({ preventScroll: true });
+            });
+            $("[data-menos]", o)?.addEventListener("click", () => {
+                lerTela();
+                // Remove de preferência um participante ainda em branco desta linha.
+                const idx = estado.map((p, i) => ({ p, i })).filter(x => chave(x.p.tipo, x.p.meia) === chave(tipo, meia));
+                if (!idx.length) return;
+                const vazio = [...idx].reverse().find(x => !x.p.meu && !x.p.nome && !x.p.email && !x.p.telefone) || idx[idx.length - 1];
+                const eraMeu = vazio.p.meu;
+                estado.splice(vazio.i, 1);
+                if (eraMeu && estado.length && !estado.some(p => p.meu)) estado[0].meu = true;
+                desenhar();
+            });
+        });
+        formCk.addEventListener("submit", () => lerTela());
+        desenhar();
+    }
+
+    // ---------- Pedido: espera o Pix cair e recarrega a página ----------
+    const esperaPix = $("[data-situacao]");
+    if (esperaPix?.dataset.situacao) {
+        let tentativas = 0;
+        const conferir = async () => {
+            if (document.hidden) return;
+            tentativas++;
+            try {
+                const r = await (await fetch(esperaPix.dataset.situacao, { headers: { Accept: "application/json" } })).json();
+                if (r.pago) { location.reload(); return; }
+            } catch { }
+        };
+        // A cada 5 s nos primeiros 15 min; depois a cada 30 s.
+        const ciclo = () => setTimeout(async () => { await conferir(); ciclo(); }, tentativas < 180 ? 5000 : 30000);
+        ciclo();
+    }
+
+    // CPF: 000.000.000-00 enquanto digita.
+    $$('input[name=cpf]').forEach(i => i.addEventListener("input", () => {
+        const d = i.value.replace(/\D/g, "").slice(0, 11);
+        i.value = d.replace(/^(\d{3})(\d)/, "$1.$2").replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1-$2");
+    }));
+
     // ---------- Página pública: cupom de desconto ----------
     const formIns = $("#form-inscricao");
     if (formIns && $("[data-aplicar-cupom]", formIns)) {
@@ -198,7 +370,7 @@
         const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
         const fmt = v => v <= 0 ? "Gratuito" : brl.format(v).replace(",00", "");
         const precos = $$(".preco[data-preco]", formIns);
-        const original = () => precos.forEach(p => p.textContent = fmt(+p.dataset.preco));
+        const original = () => { precos.forEach(p => p.textContent = fmt(+p.dataset.preco)); cupomAtual = null; recalcularCheckout(); };
         const aplicar = async () => {
             const codigo = campo.value.trim();
             original();
@@ -209,6 +381,8 @@
                 msg.textContent = r.texto;
                 msg.classList.add(r.valido ? "ok" : "erro");
                 if (!r.valido) return;
+                cupomAtual = { tipo: r.tipo, valor: +r.valor };
+                recalcularCheckout();
                 precos.forEach(p => {
                     const base = +p.dataset.preco;
                     if (base <= 0) return;

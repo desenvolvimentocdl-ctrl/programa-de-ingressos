@@ -69,13 +69,13 @@ else
                             <div style="min-width:0"><b>@i.Nome</b><small>@i.Email@(i.Telefone is { } t ? $" · {t}" : "")</small></div>
                         </div>
                     </td>
-                    <td class="oculta-m"><span>@(i.TipoIngresso?.Espaco is { } esp ? $"{esp.Nome} · " : "")@i.TipoIngresso?.Nome</span>@if (i.Cupom is { } cp) { <span class="etiqueta" title="Cupom: @Hora.Dinheiro(i.Desconto) de desconto">@cp.Codigo</span> }<br><small class="suave mono">@i.Codigo</small>@if (i.Canal is { } canal) { <small class="suave"> · via @DivulgacaoService.NomeCanal(canal)</small> }</td>
+                    <td class="oculta-m"><span>@(i.TipoIngresso?.Espaco is { } esp ? $"{esp.Nome} · " : "")@i.TipoIngresso?.Nome</span>@if (i.Meia) { <span class="etiqueta" title="Meia-entrada: conferir documento">Meia</span> }@if (i.Cupom is { } cp) { <span class="etiqueta" title="Cupom: @Hora.Dinheiro(i.Desconto) de desconto">@cp.Codigo</span> }<br><small class="suave mono">@i.Codigo</small>@if (i.Pedido is { } ped && ped.Email != i.Email) { <small class="suave" title="Pedido @ped.Codigo"> · comprado por @ped.Nome</small> }@if (i.Canal is { } canal) { <small class="suave"> · via @DivulgacaoService.NomeCanal(canal)</small> }</td>
                     <td>
                         @if (i.Ativa)
                         {
                             <span class="pilula @Texto.ClassePagamento(i.Pagamento)">@Texto.NomePagamento(i.Pagamento)@(i.Pagamento == StatusPagamento.Pendente && i.Valor > 0 ? $" · {Hora.Dinheiro(i.Valor)}" : "")</span>
                             @if (i.Pagamento == StatusPagamento.Pago) { <span class="forma">@Hora.Dinheiro(i.Valor)@(i.FormaPagamento is { } fp ? $" · {fp}" : "")</span> }
-                            else if (i.Pagamento == StatusPagamento.Pendente && i.CieloLinkId is not null) { <span class="forma">abriu o pagamento na Cielo</span> }
+                            else if (i.Pagamento == StatusPagamento.Pendente && (i.CieloLinkId ?? i.Pedido?.CieloLinkId) is not null) { <span class="forma">abriu o pagamento na Cielo</span> }
                         }
                         else
                         {

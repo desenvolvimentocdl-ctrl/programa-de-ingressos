@@ -1,0 +1,34 @@
+@model string?
+@{ Layout = null; }
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Esqueci minha senha · Plateia</title>
+    <partial name="_Fontes" />
+</head>
+<body>
+<div class="login">
+    <section class="login-arte cartaz" aria-hidden="true">
+        <a class="marca" href="/" style="text-decoration:none"><partial name="_Marca" /></a>
+        <h2 class="display">Acontece<br>com todo<br>mundo.</h2>
+        <p style="max-width:44ch;font-weight:500">Mandamos um código de 6 dígitos para o seu e-mail. Com ele, você cria uma senha nova.</p>
+    </section>
+    <section class="login-form">
+        <div class="login-caixa">
+            <h1>Esqueci a senha</h1>
+            <p class="suave" style="margin-top:-8px">Informe o e-mail da sua conta. Vamos enviar um código para criar uma senha nova.</p>
+            @if (ViewBag.Erro is string erro) { <div class="alerta-caixa erro" role="alert">@erro</div> }
+            @if (TempData["erro"] is string erroTd) { <div class="alerta-caixa erro" role="alert">@erroTd</div> }
+            <form method="post" asp-antiforgery="true" action="/esqueci-senha">
+                <label class="campo">E-mail<input type="email" name="email" value="@Model" required maxlength="180" autocomplete="email" autofocus></label>
+                <button class="btn pri grande">Enviar código</button>
+            </form>
+            <p class="suave" style="font-size:14px;text-align:center">Já tem o código? <a href="/redefinir-senha@(Model is null ? "" : "?email=" + Uri.EscapeDataString(Model))">Digitar o código</a> · <a href="/entrar">Voltar para entrar</a></p>
+            <p class="suave" style="font-size:12px;text-align:center">Entrou com Google, Apple ou Microsoft? Use o mesmo botão em "Entrar": não precisa de senha.</p>
+        </div>
+    </section>
+</div>
+</body>
+</html>

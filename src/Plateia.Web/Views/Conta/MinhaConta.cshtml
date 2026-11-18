@@ -1,13 +1,24 @@
 @model Usuario
-@{ ViewData["Title"] = "Minha conta"; }
-<div class="cabeca"><div><h1>Minha conta</h1><p>@Model.Email</p></div></div>
+@inject Microsoft.AspNetCore.Authentication.IAuthenticationSchemeProvider Esquemas
+@{
+    ViewData["Title"] = "Minha conta";
+    // Conta de público usa o visual da vitrine e não tem perfil de produtor.
+    var produtor = Model.Perfil != Perfil.Participante;
+    if (!produtor) { Layout = "_LayoutPublico"; }
+}
+@if (!produtor) { @:<div class="pagina-conta">
+}
+<div class="cabeca"><div><h1>Minha conta</h1><p>@Model.Email @if (!Model.EmailConfirmado) { <a href="/confirmar-email">· confirmar e-mail</a> }</p></div>
+    @if (!produtor) { <a class="btn" href="/virar-produtor">Quero vender ingressos</a> }</div>
 <div class="bento">
     <form class="secao" method="post" asp-antiforgery="true" action="/minha-conta" style="grid-column:span 6">
         <h2>Dados</h2>
         <label class="campo">Nome<input name="nome" value="@Model.Nome" required maxlength="120"></label>
         <label class="campo">Telefone / WhatsApp<input name="telefone" value="@Model.Telefone" inputmode="tel"></label>
+        @if (produtor)
+        {
         <h2 style="margin-top:8px">Perfil público</h2>
-        @{ var paginaPublica = Model.Slug is not null && Model.Aprovado ? "/p/" + Model.Slug : null; }
+        var paginaPublica = Model.Slug is not null && Model.Aprovado ? "/p/" + Model.Slug : null;
         <p class="suave" style="font-size:14px;margin-top:-10px">Aparece na página dos seus eventos.@if (paginaPublica is not null) { <text> Sua página: <a href="@paginaPublica" target="_blank">@paginaPublica</a></text> }</p>
         <label class="campo">Nome do produtor <small>empresa, coletivo ou marca (vazio = seu nome)</small><input name="marca" value="@Model.NomePublico" maxlength="120"></label>
         <label class="campo">Sobre <small>até 1000 caracteres</small><textarea name="bio" rows="4" maxlength="1000">@Model.Bio</textarea></label>
@@ -16,13 +27,52 @@
             <label class="campo s3">Cidade<input name="cidade" value="@Model.Cidade" maxlength="80"></label>
         </div>
         <label class="campo">Site<input name="site" value="@Model.Site" maxlength="200" placeholder="https://"></label>
+        }
         <button class="btn pri" style="justify-self:start">Salvar</button>
     </form>
-    <form class="secao" method="post" asp-antiforgery="true" action="/minha-conta/senha" style="grid-column:span 6">
-        <h2>Trocar senha</h2>
-        <label class="campo">Senha atual<input type="password" name="atual" autocomplete="current-password" required></label>
+    <div style="grid-column:span 6;display:grid;gap:16px;align-content:start">
+    <form class="secao" method="post" asp-antiforgery="true" action="/minha-conta/senha">
+        @if (Model.TemSenha)
+        {
+            <h2>Trocar senha</h2>
+            <label class="campo">Senha atual<input type="password" name="atual" autocomplete="current-password" required></label>
+        }
+        else
+        {
+            <h2>Criar senha</h2>
+            <p class="suave" style="font-size:14px;margin-top:-10px">Você entra com @string.Join(" ou ", Model.Logins.Select(l => l.Provedor)). Crie uma senha se quiser entrar também com e-mail e senha.</p>
+        }
         <label class="campo">Nova senha <small>mínimo 8 caracteres</small><input type="password" name="nova" autocomplete="new-password" minlength="8" required></label>
         <label class="campo">Confirme a nova senha<input type="password" name="confirmacao" autocomplete="new-password" minlength="8" required></label>
-        <button class="btn pri" style="justify-self:start">Trocar senha</button>
+        <button class="btn pri" style="justify-self:start">@(Model.TemSenha ? "Trocar senha" : "Criar senha")</button>
     </form>
+    <div class="secao">
+        <h2>Contas conectadas</h2>
+        <p class="suave" style="font-size:14px;margin-top:-10px">Entre sem senha com a sua conta Google, Apple ou Microsoft.</p>
+        @foreach (var l in Model.Logins.OrderBy(x => x.Provedor))
+        {
+            <form method="post" asp-antiforgery="true" action="/minha-conta/conexoes/@l.Id/remover" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+                <span><b>@l.Provedor</b> <small class="suave">@l.Email</small></span>
+                <button class="btn fantasma">Desconectar</button>
+            </form>
+        }
+        @{
+            var conectados = Model.Logins.Select(l => l.Provedor).ToHashSet();
+            var faltam = new List<string>();
+            foreach (var p in LoginExternoConfig.Provedores)
+                if (!conectados.Contains(p) && await Esquemas.GetSchemeAsync(p) is not null) faltam.Add(p);
+        }
+        @foreach (var p in faltam)
+        {
+            <form method="post" asp-antiforgery="true" action="/entrar/externo">
+                <input type="hidden" name="provedor" value="@p">
+                <input type="hidden" name="returnUrl" value="/minha-conta">
+                <button class="btn">Conectar @p</button>
+            </form>
+        }
+        @if (Model.Logins.Count == 0 && faltam.Count == 0) { <p class="suave" style="font-size:14px">Nenhuma forma de entrar com conta externa foi configurada neste servidor.</p> }
+    </div>
+    </div>
 </div>
+@if (!produtor) { @:</div>
+}

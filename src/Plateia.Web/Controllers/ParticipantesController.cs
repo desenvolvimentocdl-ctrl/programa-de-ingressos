@@ -20,7 +20,7 @@ public class ParticipantesController(AppDbContext db, EventoService eventos, Ins
         if (e is null) return NotFound();
         filtro = Filtros.Contains(filtro) ? filtro! : "todos";
 
-        var consulta = db.Inscricoes.Include(i => i.TipoIngresso).ThenInclude(t => t!.Espaco).Include(i => i.Cupom).Where(i => i.EventoId == id);
+        var consulta = db.Inscricoes.Include(i => i.TipoIngresso).ThenInclude(t => t!.Espaco).Include(i => i.Cupom).Include(i => i.Pedido).Where(i => i.EventoId == id);
         consulta = filtro switch
         {
             "pagos" => consulta.Where(i => i.Status == StatusInscricao.Confirmada && i.Pagamento == StatusPagamento.Pago),
@@ -90,15 +90,25 @@ public class ParticipantesController(AppDbContext db, EventoService eventos, Ins
     {
         if (await eventos.ObterAsync(id, Eu) is null) return NotFound();
         if (!pagamentos.Online) return VoltarCom("O pagamento online (Cielo) ainda não foi configurado.");
+        // Inscrições avulsas com link próprio e pedidos (checkout) com link do pedido inteiro.
         var pendentes = await db.Inscricoes.Where(i => i.EventoId == id && i.Status == StatusInscricao.Confirmada
-            && i.Pagamento == StatusPagamento.Pendente && i.CieloLinkId != null).ToListAsync();
+            && i.Pagamento == StatusPagamento.Pendente && i.CieloLinkId != null && i.PedidoId == null).ToListAsync();
+        var pedidos = await db.Pedidos.Include(p => p.Inscricoes).Where(p => p.EventoId == id && p.CieloLinkId != null
+            && p.Inscricoes.Any(i => i.Status == StatusInscricao.Confirmada && i.Pagamento == StatusPagamento.Pendente)).ToListAsync();
         int pagos = 0, falhas = 0;
         foreach (var i in pendentes)
         {
             try { if (await pagamentos.SincronizarAsync(i, forcar: true) && i.Pagamento == StatusPagamento.Pago) pagos++; }
             catch { falhas++; }
         }
-        return VoltarCom($"{pendentes.Count} pendente(s) consultado(s) na Cielo: {pagos} pagamento(s) novo(s)." + (falhas > 0 ? $" {falhas} consulta(s) falharam; tente de novo." : ""));
+        foreach (var p in pedidos)
+        {
+            var antes = p.Inscricoes.Count(i => i.Pagamento == StatusPagamento.Pago);
+            try { if (await pagamentos.SincronizarAsync(p, forcar: true)) pagos += p.Inscricoes.Count(i => i.Pagamento == StatusPagamento.Pago) - antes; }
+            catch { falhas++; }
+        }
+        var consultados = pendentes.Count + pedidos.Sum(p => p.Inscricoes.Count(i => i.Ativa && (i.Pagamento == StatusPagamento.Pendente || i.CieloPedido != null)));
+        return VoltarCom($"{consultados} pendente(s) consultado(s) na Cielo: {pagos} pagamento(s) novo(s)." + (falhas > 0 ? $" {falhas} consulta(s) falharam; tente de novo." : ""));
     }
 
     [HttpPost("/eventos/{id:int}/participantes/lote")]
@@ -126,7 +136,7 @@ public class ParticipantesController(AppDbContext db, EventoService eventos, Ins
     {
         var e = await eventos.ObterAsync(id, Eu);
         if (e is null) return NotFound();
-        var itens = await db.Inscricoes.Include(i => i.TipoIngresso).Include(i => i.Cupom).Where(i => i.EventoId == id).OrderBy(i => i.Nome).ToListAsync();
+        var itens = await db.Inscricoes.Include(i => i.TipoIngresso).Include(i => i.Cupom).Include(i => i.Pedido).Where(i => i.EventoId == id).OrderBy(i => i.Nome).ToListAsync();
 
         static string C(string? v)
         {
@@ -134,14 +144,14 @@ public class ParticipantesController(AppDbContext db, EventoService eventos, Ins
             if (v.Length > 0 && "=+-@\t\r".Contains(v[0])) v = "'" + v; // evita fórmulas ao abrir no Excel
             return v.Contains(';') || v.Contains('"') || v.Contains('\n') ? "\"" + v.Replace("\"", "\"\"") + "\"" : v;
         }
-        var sb = new StringBuilder("Nome;E-mail;Telefone;Ingresso;Valor;Desconto;Cupom;Pagamento;Forma;Pago em;Pedido Cielo;Check-in;Situação;Canal;Código;Inscrito em\n");
+        var sb = new StringBuilder("Nome;E-mail;Telefone;Ingresso;Valor;Desconto;Cupom;Pagamento;Forma;Pago em;Pedido Cielo;Check-in;Situação;Canal;Código;Pedido;Comprado por;Inscrito em\n");
         foreach (var i in itens)
-            sb.AppendJoin(';', C(i.Nome), C(i.Email), C(i.Telefone), C(i.TipoIngresso?.Nome), i.Valor.ToString("0.00", Hora.PtBr),
+            sb.AppendJoin(';', C(i.Nome), C(i.Email), C(i.Telefone), C(i.TipoIngresso?.Nome + (i.Meia ? " (meia)" : "")), i.Valor.ToString("0.00", Hora.PtBr),
                 i.Desconto.ToString("0.00", Hora.PtBr), C(i.Cupom?.Codigo),
                 Texto.NomePagamento(i.Pagamento), C(i.FormaPagamento),
                 i.PagoEm is { } p ? Hora.Local(p).ToString("dd/MM/yyyy HH:mm") : "", C(i.CieloPedido),
                 i.CheckinEm is { } c ? Hora.Local(c).ToString("dd/MM/yyyy HH:mm") : "",
-                i.Ativa ? "Confirmada" : "Cancelada", C(DivulgacaoService.NomeCanal(i.Canal)), i.Codigo, Hora.Local(i.CriadoEm).ToString("dd/MM/yyyy HH:mm")).Append('\n');
+                i.Ativa ? "Confirmada" : "Cancelada", C(DivulgacaoService.NomeCanal(i.Canal)), i.Codigo, i.Pedido?.Codigo ?? "", C(i.Pedido?.Nome), Hora.Local(i.CriadoEm).ToString("dd/MM/yyyy HH:mm")).Append('\n');
 
         var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
         return File(bytes, "text/csv; charset=utf-8", $"participantes-{e.Slug}.csv");
@@ -172,7 +182,7 @@ public class ParticipantesController(AppDbContext db, EventoService eventos, Ins
             presentes,
             inscricao = i is null ? null : new
             {
-                i.Id, i.Nome, i.Codigo, tipo = i.TipoIngresso?.Espaco is { } esp ? $"{esp.Nome} · {i.TipoIngresso.Nome}" : i.TipoIngresso?.Nome, pagamento = Texto.NomePagamento(i.Pagamento),
+                i.Id, i.Nome, i.Codigo, tipo = (i.TipoIngresso?.Espaco is { } esp ? $"{esp.Nome} · {i.TipoIngresso.Nome}" : i.TipoIngresso?.Nome) + (i.Meia ? " · MEIA: conferir documento" : ""), pagamento = Texto.NomePagamento(i.Pagamento),
                 valor = Hora.Dinheiro(i.Valor), hora = i.CheckinEm is { } c ? Hora.Hhmm(c) : null, iniciais = Texto.Iniciais(i.Nome)
             }
         });

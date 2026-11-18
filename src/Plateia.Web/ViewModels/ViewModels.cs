@@ -33,6 +33,27 @@ public class PaginaEvento
     public bool AceitaInscricoes => Evento.Status == StatusEvento.Publicado && Evento.InscricoesAbertas && Livres > 0;
 }
 
+/// <summary>Um ingresso do formulário de checkout. <see cref="Meu"/> = usa os dados de quem está comprando.</summary>
+public class ParticipanteForm
+{
+    public int TipoId { get; set; }
+    public string? Nome { get; set; }
+    public string? Email { get; set; }
+    public string? Telefone { get; set; }
+    public bool Meu { get; set; }
+    /// <summary>Meia-entrada (50%), quando o ingresso oferece.</summary>
+    public bool Meia { get; set; }
+}
+
+public class PaginaMeusIngressos
+{
+    public required Usuario Usuario { get; init; }
+    public required List<Inscricao> Itens { get; init; }
+}
+
+/// <summary>O que a pessoa já tinha preenchido, para devolver o formulário quando algo dá errado.</summary>
+public record FormCheckout(string? Nome, string? Email, string? Telefone, string? Cupom, List<ParticipanteForm> Participantes);
+
 public record OrganizadorLinha(int Id, string Nome, string Email, string? Telefone, Perfil Perfil, bool Ativo, int Eventos,
     bool Aprovado = true, string? NomePublico = null, string? Slug = null, string? Cidade = null);
 

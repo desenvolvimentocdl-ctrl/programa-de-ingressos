@@ -11,7 +11,7 @@ builder.Services.AddInfraestrutura(builder.Configuration);
 builder.Services.AddScoped<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
 builder.Services.AddScoped<Imagens>();
 
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+var autenticacao = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(o =>
     {
         o.LoginPath = "/entrar";
@@ -23,10 +23,14 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         o.ExpireTimeSpan = TimeSpan.FromHours(10);
         o.SlidingExpiration = true;
     });
+// Entrar/criar conta com Google, Apple e Microsoft: cada um só liga quando as credenciais estão configuradas.
+LoginExternoConfig.Adicionar(autenticacao, builder.Configuration, builder.Environment);
 builder.Services.AddAuthorization(o =>
 {
     o.AddPolicy(Politicas.Admin, p => p.RequireRole(nameof(Perfil.Administrador)));
-    o.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+    // Tudo que não diz o contrário é área de produtor. Páginas da conta de público usam [Authorize] (só estar logado).
+    o.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireRole(nameof(Perfil.Organizador), nameof(Perfil.Administrador)).Build();
 });
 
 // Formulários públicos (inscrição) e login: limite por IP contra robôs.
@@ -62,6 +66,23 @@ app.Use(async (ctx, next) =>
     ctx.Response.Headers["X-Frame-Options"] = "DENY";
     await next();
 });
+// Endereço oficial do site (ex.: https://meusite.com.br). Quem chega por outro endereço (IP, http) é levado para ele:
+// o login com Google/Apple/Microsoft só funciona no endereço cadastrado no provedor. Avisos da Cielo não são redirecionados.
+if (app.Configuration["Site:UrlPublica"]?.TrimEnd('/') is { Length: > 0 } urlPublica)
+{
+    app.Use(async (ctx, next) =>
+    {
+        var req = ctx.Request;
+        var origem = $"{req.Scheme}://{req.Host}";
+        if ((HttpMethods.IsGet(req.Method) || HttpMethods.IsHead(req.Method)) && !req.Path.StartsWithSegments("/cielo")
+            && !string.Equals(origem, urlPublica, StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Response.Redirect(urlPublica + req.PathBase + req.Path + req.QueryString);
+            return;
+        }
+        await next();
+    });
+}
 app.UseStatusCodePagesWithReExecute("/status/{0}");
 app.UseStaticFiles();
 // Capas enviadas pelos produtores (pasta configurável, fora do Git).

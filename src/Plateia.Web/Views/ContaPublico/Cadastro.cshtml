@@ -1,0 +1,56 @@
+@model string?
+@{
+    Layout = null;
+    var f = ViewBag.Form as dynamic;
+    var rnd = new Random(23);
+}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cadastre-se · Plateia</title>
+    <partial name="_Fontes" />
+</head>
+<body>
+<div class="login">
+    <section class="login-arte cartaz" aria-hidden="true" style="--cor:#5B7CFA;--tinta:#FFFFFF">
+        <a class="marca" href="/" style="text-decoration:none"><partial name="_Marca" /></a>
+        <div style="display:grid;gap:30px">
+            <h2 class="display">Seu lugar<br>na plateia.</h2>
+            <ul class="vantagens">
+                <li>Todos os seus ingressos num lugar só</li>
+                <li>Compra rápida, com seus dados já preenchidos</li>
+                <li>Pix ou cartão de crédito</li>
+                <li>Ingresso com QR code na hora</li>
+            </ul>
+            <div class="assentos" style="--cols:24">@for (var i = 0; i < 96; i++) { <i class="@(rnd.Next(10) < 5 ? "pago" : "")" style="--i:@i"></i> }</div>
+        </div>
+        <small>Grátis para quem compra ingressos.</small>
+    </section>
+    <section class="login-form">
+        <div class="login-caixa">
+            <h1>Cadastre-se</h1>
+            <p class="suave" style="margin-top:-8px">Crie sua conta em segundos com Google, Apple ou Microsoft, ou com seu e-mail.</p>
+            @if (ViewBag.Erro is string erro) { <div class="alerta-caixa erro" role="alert">@erro</div> }
+            @{ ViewData["TextoSocial"] = "Continuar com"; ViewData["TipoConta"] = "publico"; }
+            <partial name="_LoginSocial" model="Model" />
+            <form method="post" asp-antiforgery="true" action="/cadastro">
+                <label class="campo">Nome completo<input name="nome" value="@f?.nome" required maxlength="120" autocomplete="name"></label>
+                <label class="campo">E-mail<input type="email" name="email" value="@f?.email" required maxlength="180" autocomplete="email"></label>
+                <div class="grade-form">
+                    <label class="campo s3">Senha <small>mín. 8</small><input type="password" name="senha" required minlength="8" autocomplete="new-password"></label>
+                    <label class="campo s3">Confirme<input type="password" name="confirmacao" required minlength="8" autocomplete="new-password"></label>
+                </div>
+                <label class="check"><input type="checkbox" name="aceite" value="true" required> Li e aceito os termos de uso e a política de privacidade.</label>
+                <input type="hidden" name="returnUrl" value="@Model">
+                <button class="btn pri grande">Criar conta</button>
+            </form>
+            <p class="suave" style="font-size:12px;text-align:center">Ao continuar com Google, Apple ou Microsoft, você aceita os termos de uso e a política de privacidade.</p>
+            <p class="suave" style="font-size:14px;text-align:center">Já tem conta? <a href="/entrar">Entrar</a> · Vai organizar eventos? <a href="/criar-conta">Conta de produtor</a></p>
+        </div>
+    </section>
+</div>
+<script src="~/js/plateia.js" asp-append-version="true" defer></script>
+</body>
+</html>

@@ -95,6 +95,7 @@ public class EventosController(AppDbContext db, EventoService eventos, Pagamento
 
         var ids = f["tipo_id"]; var nomes = f["tipo_nome"]; var descs = f["tipo_desc"];
         var precos = f["tipo_preco"]; var qtds = f["tipo_qtd"]; var remover = f["tipo_remover"]; var ates = f["tipo_ate"]; var tesp = f["tipo_espaco"];
+        var des = f["tipo_de"]; var seq = f["tipo_sequencia"]; var meias = f["tipo_meia"];
         var tipos = new List<DadosTipo>();
         for (var i = 0; i < nomes.Count; i++)
             tipos.Add(new DadosTipo(
@@ -103,7 +104,9 @@ public class EventosController(AppDbContext db, EventoService eventos, Pagamento
                 int.TryParse(Em(qtds, i), out var q) ? q : null,
                 Em(remover, i) == "1",
                 DateTime.TryParse(Em(ates, i), out var ate) ? Hora.ParaUtc(ate) : null,
-                Em(tesp, i) is { Length: > 0 } ch ? ch : null));
+                Em(tesp, i) is { Length: > 0 } ch ? ch : null,
+                DateTime.TryParse(Em(des, i), out var de) ? Hora.ParaUtc(de) : null,
+                Em(seq, i) == "1", Em(meias, i) == "1"));
 
         var inicio = Data("inicio") ?? throw new RegraNegocioException("Informe a data e a hora de início.");
         var onde = new LocalEvento(Enum.TryParse<FormatoEvento>(f["formato"], out var fmt) ? fmt : FormatoEvento.Presencial,
@@ -116,7 +119,8 @@ public class EventosController(AppDbContext db, EventoService eventos, Pagamento
             Enum.TryParse<StatusEvento>(f["status"], out var st) ? st : StatusEvento.Rascunho,
             f["inscricoes_abertas"] == "true", f["instrucoes"],
             int.TryParse(f["organizador"], out var org) ? org : null, espacos, tipos,
-            Eu.Admin ? f["destaque"] == "true" : null);
+            Eu.Admin ? f["destaque"] == "true" : null,
+            TemMeia: f["tem_meia"] == "true", TemLotes: f["tem_lotes"] == "true");
 
         // A imagem é conferida antes de salvar o evento, para um arquivo inválido não deixar nada pela metade.
         var capa = f.Files.GetFile("imagem") is { Length: > 0 } arq ? await imagens.SalvarCapaAsync(arq) : null;

@@ -28,16 +28,21 @@
         <p style="max-width:44ch;font-weight:500">Inscrições, pagamentos e check-in dos seus eventos, em tempo real.</p>
     </section>
     <section class="login-form">
-        <form method="post" asp-antiforgery="true" action="/entrar">
+        <div class="login-caixa">
             <h1>Entrar</h1>
-            <p class="suave" style="margin-top:-8px">Área de produtores: acompanhe vendas, participantes e check-in.</p>
+            <p class="suave" style="margin-top:-8px">Veja seus ingressos ou, se você produz eventos, acompanhe vendas e check-in.</p>
             @if (ViewBag.Erro is string erro) { <div class="alerta-caixa erro" role="alert">@erro</div> }
+            @if (TempData["erro"] is string erroTd) { <div class="alerta-caixa erro" role="alert">@erroTd</div> }
+            <partial name="_LoginSocial" model="Model" />
+        <form method="post" asp-antiforgery="true" action="/entrar">
             <label class="campo">E-mail<input type="email" name="email" value="@ViewBag.Email" autocomplete="username" required autofocus></label>
             <label class="campo">Senha<input type="password" name="senha" autocomplete="current-password" required></label>
             <input type="hidden" name="returnUrl" value="@Model">
             <button class="btn pri grande">Entrar</button>
-            <p class="suave" style="font-size:14px;text-align:center">Vai organizar um evento? <a href="/criar-conta">Criar conta de produtor</a></p>
+            <a href="/esqueci-senha" class="suave" style="font-size:14px;text-align:center">Esqueci minha senha</a>
         </form>
+            <p class="suave" style="font-size:14px;text-align:center">Não tem conta? <a href="/cadastro">Cadastre-se</a> · Vai organizar um evento? <a href="/criar-conta">Conta de produtor</a></p>
+        </div>
     </section>
 </div>
 </body>

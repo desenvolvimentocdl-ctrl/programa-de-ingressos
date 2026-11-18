@@ -5,11 +5,12 @@
 @{
     var logado = User.Identity?.IsAuthenticated == true;
     var admin = User.IsInRole(nameof(Perfil.Administrador));
+    var produtor = Sessao.Produtor(User);
+    var papel = admin ? "Administrador" : produtor ? "Produtor" : "Minha conta";
     var nome = User.Identity?.Name ?? "";
     var q = Context.Request.Query;
     var caminho = Context.Request.Path.Value ?? "/";
-    var meusEventos = logado ? "/painel" : "/entrar?returnUrl=%2Fpainel";
-    var criarEvento = logado ? "/eventos/novo" : "/criar-conta";
+    var criarEvento = produtor ? "/eventos/novo" : logado ? "/virar-produtor" : "/criar-conta";
     var atalhos = new[] { ("hoje", "Hoje"), ("amanha", "Amanhã"), ("fim-de-semana", "Neste fim de semana"), ("semana", "Próximos 7 dias"), ("mes", "Próximos 30 dias") };
     var categorias = Enum.GetValues<CategoriaEvento>();
     bool Ativo(string chave, string valor) => caminho == "/eventos" && q[chave] == valor;
@@ -47,18 +48,32 @@
         <a href="@criarEvento" class="nav-item">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Criar evento
         </a>
-        <a href="@meusEventos" class="nav-item">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8a2 2 0 0 0 0 4v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4a2 2 0 0 0 0-4V4a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1z"/><path d="M14 3v14" stroke-dasharray="2 2"/></svg>Meus eventos
-        </a>
         @if (logado)
         {
+            <a href="/meus-ingressos" class="nav-item">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8a2 2 0 0 0 0 4v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4a2 2 0 0 0 0-4V4a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1z"/><path d="M14 3v14" stroke-dasharray="2 2"/></svg>Meus ingressos
+            </a>
+            @if (produtor)
+            {
+                <a href="/painel" class="nav-item">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Meus eventos
+                </a>
+            }
             <details class="drop conta">
                 <summary aria-label="Minha conta"><span class="av">@Texto.Iniciais(nome)</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
                 <div class="drop-painel lista">
-                    <div class="quem"><b>@nome</b><small>@(admin ? "Administrador" : "Produtor")</small></div>
-                    <a href="/painel">Meus eventos</a>
-                    <a href="/eventos/novo">Criar evento</a>
-                    <a href="/minha-conta">Minha conta e perfil</a>
+                    <div class="quem"><b>@nome</b><small>@papel</small></div>
+                    <a href="/meus-ingressos">Meus ingressos</a>
+                    @if (produtor)
+                    {
+                        <a href="/painel">Meus eventos</a>
+                        <a href="/eventos/novo">Criar evento</a>
+                    }
+                    else
+                    {
+                        <a href="/virar-produtor">Quero vender ingressos</a>
+                    }
+                    <a href="/minha-conta">Minha conta@(produtor ? " e perfil" : "")</a>
                     @if (admin) { <a href="/organizadores">Produtores</a> }
                     <hr>
                     <form method="post" asp-antiforgery="true" action="/sair"><button>Sair</button></form>
@@ -68,6 +83,7 @@
         else
         {
             <a class="btn peq entrar" href="/entrar">Entrar</a>
+            <a class="btn peq cadastre" href="/cadastro">Cadastre-se</a>
         }
     </nav>
 
@@ -77,9 +93,15 @@
         <div class="drop-painel gaveta-painel">
             @if (logado)
             {
-                <div class="quem"><span class="av">@Texto.Iniciais(nome)</span><div><b>@nome</b><small>@(admin ? "Administrador" : "Produtor")</small></div></div>
+                <div class="quem"><span class="av">@Texto.Iniciais(nome)</span><div><b>@nome</b><small>@papel</small></div></div>
+                <a class="gaveta-destaque" href="/meus-ingressos">Meus ingressos</a>
+                @if (produtor) { <a class="gaveta-destaque" href="/painel">Meus eventos</a> }
             }
-            <a class="gaveta-destaque" href="@meusEventos">Meus eventos</a>
+            else
+            {
+                <a class="btn pri" href="/cadastro">Cadastre-se</a>
+                <a class="btn" href="/entrar">Entrar</a>
+            }
             <a class="gaveta-destaque" href="@criarEvento">Criar evento</a>
             <b class="gaveta-titulo">Explorar</b>
             <a href="/eventos">Todos os eventos</a>
@@ -91,13 +113,13 @@
             <hr>
             @if (logado)
             {
-                <a href="/minha-conta">Minha conta e perfil</a>
+                <a href="/minha-conta">Minha conta@(produtor ? " e perfil" : "")</a>
+                @if (!produtor) { <a href="/virar-produtor">Quero vender ingressos</a> }
                 @if (admin) { <a href="/organizadores">Produtores</a> }
                 <form method="post" asp-antiforgery="true" action="/sair"><button>Sair</button></form>
             }
             else
             {
-                <a class="btn pri" href="/entrar">Entrar</a>
                 <a href="/criar-conta">Criar conta de produtor</a>
             }
         </div>

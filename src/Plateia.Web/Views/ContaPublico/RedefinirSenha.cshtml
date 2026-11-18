@@ -1,0 +1,37 @@
+@model string?
+@{ Layout = null; }
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nova senha · Plateia</title>
+    <partial name="_Fontes" />
+</head>
+<body>
+<div class="login">
+    <section class="login-arte cartaz" aria-hidden="true">
+        <a class="marca" href="/" style="text-decoration:none"><partial name="_Marca" /></a>
+        <h2 class="display">Quase<br>lá.</h2>
+        <p style="max-width:44ch;font-weight:500">O código vale por @((int)CodigoService.Validade.TotalMinutes) minutos. Não chegou? Confira o spam ou peça outro.</p>
+    </section>
+    <section class="login-form">
+        <div class="login-caixa">
+            <h1>Nova senha</h1>
+            @if (TempData["msg"] is string msg) { <div class="alerta-caixa" role="status" style="color:var(--ok);background:color-mix(in srgb, var(--ok) 12%, transparent)">@msg</div> }
+            @if (ViewBag.Erro is string erro) { <div class="alerta-caixa erro" role="alert">@erro</div> }
+            <form method="post" asp-antiforgery="true" action="/redefinir-senha">
+                <label class="campo">E-mail<input type="email" name="email" value="@Model" required maxlength="180" autocomplete="email"></label>
+                <label class="campo">Código de 6 dígitos<input name="codigo" required inputmode="numeric" autocomplete="one-time-code" maxlength="7" pattern="[0-9 ]{6,7}" class="campo-codigo" autofocus></label>
+                <div class="grade-form">
+                    <label class="campo s3">Nova senha <small>mín. 8</small><input type="password" name="nova" required minlength="8" autocomplete="new-password"></label>
+                    <label class="campo s3">Confirme<input type="password" name="confirmacao" required minlength="8" autocomplete="new-password"></label>
+                </div>
+                <button class="btn pri grande">Salvar nova senha</button>
+            </form>
+            <p class="suave" style="font-size:14px;text-align:center"><a href="/esqueci-senha@(Model is null ? "" : "?email=" + Uri.EscapeDataString(Model))">Pedir outro código</a> · <a href="/entrar">Voltar para entrar</a></p>
+        </div>
+    </section>
+</div>
+</body>
+</html>

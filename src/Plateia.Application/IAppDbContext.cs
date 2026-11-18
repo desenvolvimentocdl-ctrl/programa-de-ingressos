@@ -13,6 +13,9 @@ public interface IAppDbContext
     DbSet<Cupom> Cupons { get; }
     DbSet<EspacoEvento> Espacos { get; }
     DbSet<VisitaEvento> Visitas { get; }
+    DbSet<Pedido> Pedidos { get; }
+    DbSet<LoginExterno> LoginsExternos { get; }
+    DbSet<CodigoEmail> CodigosEmail { get; }
     DatabaseFacade Database { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }
@@ -21,6 +24,7 @@ public interface IAppDbContext
 public record UsuarioAtual(int Id, string Nome, Perfil Perfil)
 {
     public bool Admin => Perfil == Perfil.Administrador;
+    public bool Produtor => Perfil != Perfil.Participante;
 }
 
 public class RegraNegocioException(string mensagem) : Exception(mensagem);

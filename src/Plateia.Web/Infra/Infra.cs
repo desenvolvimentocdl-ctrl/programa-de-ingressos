@@ -106,7 +106,7 @@ public static class Texto
 
     public static string PrimeiroNome(string? nome) => (nome ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
 
-    public static string NomePerfil(Perfil p) => p == Perfil.Administrador ? "Administrador" : "Organizador";
+    public static string NomePerfil(Perfil p) => p switch { Perfil.Administrador => "Administrador", Perfil.Participante => "Público", _ => "Organizador" };
 
     public static string NomePagamento(StatusPagamento p) => p switch
     {
@@ -223,7 +223,7 @@ public static class Inicializacao
                 log.LogWarning("Nenhum usuário cadastrado. Defina Admin__Email e Admin__Senha para criar o primeiro administrador.");
                 return;
             }
-            var admin = new Usuario { Nome = config["Admin:Nome"] ?? "Administrador", Email = email.Trim().ToLowerInvariant(), Perfil = Perfil.Administrador };
+            var admin = new Usuario { Nome = config["Admin:Nome"] ?? "Administrador", Email = email.Trim().ToLowerInvariant(), Perfil = Perfil.Administrador, EmailConfirmado = true };
             admin.SenhaHash = scope.ServiceProvider.GetRequiredService<IPasswordHasher<Usuario>>().HashPassword(admin, senha);
             db.Usuarios.Add(admin);
             await db.SaveChangesAsync();

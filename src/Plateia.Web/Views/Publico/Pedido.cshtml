@@ -1,0 +1,127 @@
+@model Pedido
+@{
+    Layout = "_LayoutPublico";
+    var e = Model.Evento!;
+    ViewData["Title"] = $"Pedido {Model.Codigo} · {e.Titulo}";
+    ViewData["Cor"] = e.Cor;
+    ViewData["LinkMarca"] = $"/e/{e.Slug}";
+    var novo = Context.Request.Query["novo"] == "1";
+    var itens = Model.Inscricoes.OrderBy(i => i.Status).ThenBy(i => i.Id).ToList();
+    var ativos = itens.Where(i => i.Ativa).ToList();
+    var aPagar = Model.APagar;
+    var tinta = Texto.TintaSobre(e.Cor);
+    var link = $"{Context.Request.Scheme}://{Context.Request.Host}/pedido/{Model.Codigo}";
+}
+<div class="pagina-pedido">
+    <a class="voltar" href="/e/@e.Slug" style="margin:0">← @e.Titulo</a>
+    @if (novo)
+    {
+        <div style="text-align:center;display:grid;gap:6px">
+            <b class="display" style="font-size:40px">@(aPagar > 0 ? "Pedido reservado!" : "Pedido confirmado!")</b>
+            <p class="suave">@(aPagar > 0 ? "Os lugares estão guardados. Conclua o pagamento para garantir os ingressos." : "Cada participante tem o próprio ingresso com QR code. Envie o link para cada um.")</p>
+        </div>
+    }
+
+    <section class="pedido-cab cartaz" style="--cor:@e.Cor;--tinta:@tinta">
+        <div class="linha"><span>Pedido <span class="mono">@Model.Codigo</span></span><span>@Hora.Data(e.InicioEm)</span></div>
+        <h1 class="display">@e.Titulo</h1>
+        <div class="linha"><span>@(e.Formato == FormatoEvento.Online ? "Online" : e.Local)</span><span>@ativos.Count ingresso(s)</span></div>
+    </section>
+
+    @if (TempData["erro"] is string erroPg) { <div class="alerta-caixa erro" role="alert">@erroPg</div> }
+
+    @if (aPagar > 0)
+    {
+        var aberto = e.Status == StatusEvento.Publicado && (e.FimEm ?? e.InicioEm) > DateTime.UtcNow;
+        var temPix = ViewBag.Pix == true && aberto;
+        var temCartao = ViewBag.Cartao == true && aberto;
+        var pixPronto = temPix && Model.PixCopiaCola is not null && Model.PixValor == aPagar;
+        if (temPix || temCartao)
+        {
+            <section class="pagamento" id="pagamento" data-situacao="@(pixPronto ? $"/pedido/{Model.Codigo}/situacao" : null)">
+                <div class="pagamento-topo"><b>Falta pagar @Hora.Dinheiro(aPagar)</b><span>Um pagamento só para todos os ingressos do pedido.</span></div>
+                <div class="abas-pagamento @(temPix && temCartao ? "duas" : "")" role="tablist">
+                    @if (temPix) { <input type="radio" name="forma" id="forma-pix" checked><label for="forma-pix" role="tab">Pix</label> }
+                    @if (temCartao) { <input type="radio" name="forma" id="forma-cartao" checked="@(temPix ? null : "checked")"><label for="forma-cartao" role="tab">Cartão de crédito</label> }
+
+                    @if (temPix)
+                    {
+                        <div class="painel-forma painel-pix">
+                            @if (pixPronto)
+                            {
+                                <div class="qr-pix" role="img" aria-label="QR Code do Pix">@Html.Raw(Qr.Svg(Model.PixCopiaCola!))</div>
+                                <p class="suave" style="text-align:center;font-size:14px">Abra o app do seu banco, escolha <b>Pix › Ler QR Code</b> ou use o código copia e cola.</p>
+                                <div class="copia-cola">
+                                    <input id="pix-copia" value="@Model.PixCopiaCola" readonly aria-label="Pix copia e cola" onfocus="this.select()">
+                                    <button type="button" class="btn pri" data-copiar-de="#pix-copia">Copiar código</button>
+                                </div>
+                                <p class="aguardando" aria-live="polite"><span class="pulso"></span>Aguardando o pagamento. Esta página atualiza sozinha quando o Pix cair.</p>
+                            }
+                            else
+                            {
+                                <form method="post" asp-antiforgery="true" action="/pedido/@Model.Codigo/pix" class="form-pix">
+                                    <label class="campo">CPF de quem vai pagar <small>exigido pelo Pix da Cielo; não fica guardado</small>
+                                        <input name="cpf" inputmode="numeric" autocomplete="off" required maxlength="14" placeholder="000.000.000-00"></label>
+                                    <button class="btn pri grande">Gerar QR Code Pix</button>
+                                </form>
+                                <p class="suave" style="font-size:13px;text-align:center">Aprovação na hora: os ingressos ficam pagos assim que o Pix cair.</p>
+                            }
+                        </div>
+                    }
+                    @if (temCartao)
+                    {
+                        <div class="painel-forma painel-cartao">
+                            <form method="post" asp-antiforgery="true" action="/pedido/@Model.Codigo/pagar" style="display:grid;gap:10px">
+                                <button class="btn pri grande">Pagar @Hora.Dinheiro(aPagar) com cartão de crédito</button>
+                                <small class="suave" style="text-align:center">Você vai para a página segura da Cielo: os dados do cartão não passam pelo Plateia. Depois de pagar, volte a este link; os ingressos atualizam sozinhos.</small>
+                            </form>
+                        </div>
+                    }
+                </div>
+            </section>
+            @if (e.InstrucoesPagamento is { } outras) { <div class="pagar"><b>Outras formas de pagar</b><span>@outras</span></div> }
+        }
+        else
+        {
+            <div class="pagar">
+                <b>Falta pagar @Hora.Dinheiro(aPagar)</b>
+                <span>@(e.InstrucoesPagamento ?? "A organização vai entrar em contato com as instruções de pagamento.")</span>
+                <span style="opacity:.75">Informe o código do pedido <b class="mono">@Model.Codigo</b> ao enviar o comprovante.</span>
+            </div>
+        }
+    }
+
+    <div style="display:grid;gap:10px">
+        <h2 style="font-size:15px">Ingressos</h2>
+        <ul class="lista-pedido">
+            @{ var n = 0; }
+            @foreach (var i in itens)
+            {
+                n++;
+                <li class="@(i.Ativa ? "" : "cancelado")">
+                    <a href="/ingresso/@i.Codigo">
+                        <span class="num">@n</span>
+                        <span><b>@i.Nome</b><small>@(i.TipoIngresso?.Espaco is { } esp ? $"{esp.Nome} · " : "")@i.TipoIngresso?.Nome@(i.Meia ? " (meia)" : "") · <span class="mono">@i.Codigo</span></small></span>
+                        <span class="lado">
+                            @if (!i.Ativa) { <span class="pilula perigo">Cancelado</span> }
+                            else { <span class="pilula @Texto.ClassePagamento(i.Pagamento)">@Texto.NomePagamento(i.Pagamento)</span> }
+                            <span>@Texto.Preco(i.Valor)</span>
+                        </span>
+                    </a>
+                </li>
+            }
+        </ul>
+        <p class="suave" style="font-size:13px">Toque num ingresso para ver o QR code. Mande o link de cada ingresso para o participante: ele é a entrada no evento.</p>
+    </div>
+
+    <div class="resumo-pedido">
+        <div><span>Comprado por</span><span>@Model.Nome</span></div>
+        <div><span>E-mail</span><span>@Model.Email</span></div>
+        @if (Model.Desconto > 0) { <div><span>Desconto (cupom)</span><span>− @Hora.Dinheiro(Model.Desconto)</span></div> }
+        <div class="total"><span>Total</span><span>@Texto.Preco(ativos.Sum(i => i.Valor))</span></div>
+    </div>
+
+    <div class="botoes-ingresso">
+        <button class="btn" type="button" data-copiar="@link" data-aviso="Link do pedido copiado." style="grid-column:1/-1">Copiar link do pedido</button>
+    </div>
+</div>

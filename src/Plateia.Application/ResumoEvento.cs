@@ -15,10 +15,52 @@ public record ResumoEspaco(int Id, string Nome, string? Descricao, int Capacidad
     public int Livres => Math.Max(0, Capacidade - Ocupados);
 }
 
+/// <summary>AguardaLote = virada de lote: só abre quando o lote anterior esgotar ou encerrar.</summary>
+public enum SituacaoVenda { AVenda, Esgotado, Encerrado, EmBreve, AguardaLote }
+
 public record ResumoTipo(int Id, string Nome, decimal Preco, int? Quantidade, int Vendidos, bool Ativo, DateTime? VendasAte = null, string? Descricao = null, int? EspacoId = null)
 {
-    public bool Esgotado => Quantidade is { } q && Vendidos >= q;
-    public bool Encerrado => VendasAte is { } v && DateTime.UtcNow > v;
+    public DateTime? VendasDe { get; init; }
+    public bool AbreAposAnterior { get; init; }
+    public bool PermiteMeia { get; init; }
+    public SituacaoVenda Situacao { get; init; }
+    /// <summary>Nome do lote que precisa acabar antes deste abrir (quando <see cref="Situacao"/> é AguardaLote).</summary>
+    public string? LoteAnterior { get; init; }
+
+    public bool Esgotado => Situacao == SituacaoVenda.Esgotado;
+    public bool Encerrado => Situacao == SituacaoVenda.Encerrado;
+    public bool AVenda => Situacao == SituacaoVenda.AVenda;
+    public bool Meia => PermiteMeia && Preco > 0;
+    public decimal PrecoMeia => Math.Round(Preco / 2m, 2);
+    public int? Restantes => Quantidade is { } q ? Math.Max(0, q - Vendidos) : null;
+
+    /// <summary>
+    /// Situação de venda de cada tipo, na ordem do evento. Um tipo com "abre após o anterior" fica aguardando
+    /// enquanto o tipo ativo de cima ainda estiver à venda, em breve ou também aguardando (virada em cadeia: 1º → 2º → 3º lote).
+    /// </summary>
+    public static List<ResumoTipo> Montar(IEnumerable<TipoIngresso> tipos, Func<int, int> vendidos, DateTime agoraUtc)
+    {
+        var lista = new List<ResumoTipo>();
+        ResumoTipo? anterior = null;
+        foreach (var t in tipos.OrderBy(t => t.Ordem))
+        {
+            var v = vendidos(t.Id);
+            var situacao =
+                !t.Ativo || t.VendaEncerrada(agoraUtc) ? SituacaoVenda.Encerrado
+                : t.Quantidade is { } q && v >= q ? SituacaoVenda.Esgotado
+                : t.VendaNaoComecou(agoraUtc) ? SituacaoVenda.EmBreve
+                : t.AbreAposAnterior && anterior is { Situacao: SituacaoVenda.AVenda or SituacaoVenda.EmBreve or SituacaoVenda.AguardaLote } ? SituacaoVenda.AguardaLote
+                : SituacaoVenda.AVenda;
+            var r = new ResumoTipo(t.Id, t.Nome, t.Preco, t.Quantidade, v, t.Ativo, t.VendasAte, t.Descricao, t.EspacoId)
+            {
+                VendasDe = t.VendasDe, AbreAposAnterior = t.AbreAposAnterior, PermiteMeia = t.PermiteMeia, Situacao = situacao,
+                LoteAnterior = situacao == SituacaoVenda.AguardaLote ? anterior!.Nome : null
+            };
+            lista.Add(r);
+            if (t.Ativo) anterior = r;
+        }
+        return lista;
+    }
 }
 
 /// <summary>Números do painel de um evento. Eventos têm no máximo alguns milhares de inscrições, então tudo é calculado em memória.</summary>
@@ -40,8 +82,7 @@ public class ResumoEvento
     public decimal AReceber => Ativas.Where(l => l.Pagamento == StatusPagamento.Pendente).Sum(l => l.Valor);
     public double Ocupacao => Evento.Capacidade == 0 ? 0 : Math.Min(1, (double)Confirmados / Evento.Capacidade);
 
-    public List<ResumoTipo> PorTipo => Evento.Tipos.OrderBy(t => t.Ordem)
-        .Select(t => new ResumoTipo(t.Id, t.Nome, t.Preco, t.Quantidade, Ativas.Count(l => l.TipoId == t.Id), t.Ativo, t.VendasAte, t.Descricao, t.EspacoId))
+    public List<ResumoTipo> PorTipo => ResumoTipo.Montar(Evento.Tipos, id => Ativas.Count(l => l.TipoId == id), DateTime.UtcNow)
         .Where(t => t.Ativo || t.Vendidos > 0).ToList();
 
     public List<ResumoEspaco> PorEspaco => Evento.Espacos.OrderBy(x => x.Ordem)

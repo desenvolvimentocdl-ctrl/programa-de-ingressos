@@ -54,7 +54,7 @@ public class PublicoController(AppDbContext db, InscricaoService inscricoes, Pag
     [HttpGet("/p/{slug}")]
     public async Task<IActionResult> Produtor(string slug)
     {
-        var u = await db.Usuarios.FirstOrDefaultAsync(x => x.Slug == slug && x.Ativo && x.Aprovado);
+        var u = await db.Usuarios.FirstOrDefaultAsync(x => x.Slug == slug && x.Ativo && x.Aprovado && x.Perfil != Perfil.Participante);
         if (u is null) return NotFound();
         return View(new PaginaProdutor
         {
@@ -108,24 +108,99 @@ public class PublicoController(AppDbContext db, InscricaoService inscricoes, Pag
                     tipo = c.Tipo.ToString(), valor = c.Valor });
     }
 
+    /// <summary>
+    /// Checkout único: quem compra informa os próprios dados e o nome (e, se quiser, e-mail e WhatsApp) de cada participante.
+    /// Um ingresso só vai direto para o ingresso; dois ou mais vão para a página do pedido.
+    /// </summary>
     [HttpPost("/e/{slug}"), EnableRateLimiting("publico")]
-    public async Task<IActionResult> Inscrever(string slug, int tipo, string nome, string email, string? telefone, string? cupom, string? canal)
+    public async Task<IActionResult> Inscrever(string slug, string nome, string email, string? telefone, List<ParticipanteForm>? p, string? cupom, string? canal)
     {
         var pagina = await Montar(slug);
         if (pagina is null) return NotFound();
+        var participantes = (p ?? []).Where(x => x.TipoId > 0).ToList();
         try
         {
-            var ins = await inscricoes.InscreverAsync(pagina.Evento.Id, tipo, nome, email, telefone, OrigemInscricao.Site, cupom: cupom, canal: canal);
-            return Redirect($"/ingresso/{ins.Codigo}?novo=1");
+            var itens = participantes.Select(x => x.Meu
+                ? new ParticipanteCheckout(x.TipoId, nome, email, telefone, x.Meia)
+                : new ParticipanteCheckout(x.TipoId, x.Nome, x.Email, x.Telefone, x.Meia)).ToList();
+            var pedido = await inscricoes.CheckoutAsync(pagina.Evento.Id, nome, email, telefone, itens, cupom, canal);
+            return pedido.Inscricoes.Count == 1
+                ? Redirect($"/ingresso/{pedido.Inscricoes[0].Codigo}?novo=1")
+                : Redirect($"/pedido/{pedido.Codigo}?novo=1");
         }
         catch (RegraNegocioException ex)
         {
             ViewBag.Erro = ex.Message;
-            ViewBag.Form = new { tipo, nome, email, telefone, cupom };
-            var p = await Montar(slug);
-            p!.Canal = canal;
-            return View("Evento", p);
+            ViewBag.Form = new FormCheckout(nome, email, telefone, cupom, participantes);
+            var pg = await Montar(slug);
+            pg!.Canal = canal;
+            return View("Evento", pg);
         }
+    }
+
+    [HttpGet("/pedido/{codigo}")]
+    public async Task<IActionResult> Pedido(string codigo)
+    {
+        var p = await CarregarPedido(codigo);
+        if (p is null) return NotFound();
+        if (p.APagar > 0 && p.CieloLinkId is not null)
+        {
+            try { await pagamentos.SincronizarAsync(p); }
+            catch (Exception ex) { log.LogWarning(ex, "Falha ao consultar a Cielo para o pedido {Codigo}", p.Codigo); }
+        }
+        ViewBag.Pix = pagamentos.Pix;
+        ViewBag.Cartao = pagamentos.Cartao;
+        return View(p);
+    }
+
+    /// <summary>Leva para a página de pagamento da Cielo com o total do pedido (o link é criado na primeira vez).</summary>
+    [HttpPost("/pedido/{codigo}/pagar"), EnableRateLimiting("publico")]
+    public async Task<IActionResult> PagarPedido(string codigo)
+    {
+        var p = await CarregarPedido(codigo);
+        if (p is null) return NotFound();
+        try { return Redirect(await pagamentos.UrlPagamentoAsync(p)); }
+        catch (HttpRequestException ex)
+        {
+            log.LogError(ex, "Cielo indisponível ao gerar link do pedido {Codigo}", p.Codigo);
+            throw new RegraNegocioException("A Cielo não respondeu agora. Tente de novo em instantes.");
+        }
+    }
+
+    /// <summary>Gera o Pix do pedido (QR Code + copia e cola) na própria página.</summary>
+    [HttpPost("/pedido/{codigo}/pix"), EnableRateLimiting("publico")]
+    public async Task<IActionResult> GerarPix(string codigo, string? cpf)
+    {
+        var p = await CarregarPedido(codigo);
+        if (p is null) return NotFound();
+        try { await pagamentos.GerarPixAsync(p, cpf); }
+        catch (HttpRequestException ex)
+        {
+            log.LogError(ex, "Cielo indisponível ao gerar Pix do pedido {Codigo}", p.Codigo);
+            throw new RegraNegocioException("A Cielo não respondeu agora. Tente de novo em instantes.");
+        }
+        return Redirect($"/pedido/{p.Codigo}#pagamento");
+    }
+
+    /// <summary>A página do pedido pergunta a cada poucos segundos se o Pix já caiu (a consulta à Cielo é limitada a uma a cada 5 s).</summary>
+    [HttpGet("/pedido/{codigo}/situacao")]
+    public async Task<IActionResult> SituacaoPedido(string codigo)
+    {
+        var p = await CarregarPedido(codigo);
+        if (p is null) return NotFound();
+        if (p.APagar > 0)
+        {
+            try { await pagamentos.SincronizarAsync(p); }
+            catch (Exception ex) { log.LogWarning(ex, "Falha ao consultar a Cielo para o pedido {Codigo}", p.Codigo); }
+        }
+        return Json(new { pago = p.APagar <= 0 });
+    }
+
+    Task<Pedido?> CarregarPedido(string codigo)
+    {
+        var c = Utilidades.NormalizarCodigo(codigo);
+        return db.Pedidos.Include(x => x.Evento).Include(x => x.Inscricoes).ThenInclude(i => i.TipoIngresso).ThenInclude(t => t!.Espaco)
+            .FirstOrDefaultAsync(x => x.Codigo == c);
     }
 
     [HttpGet("/ingresso/{codigo}")]
@@ -134,13 +209,16 @@ public class PublicoController(AppDbContext db, InscricaoService inscricoes, Pag
         var i = await Carregar(codigo);
         if (i is null) return NotFound();
         // Quem volta da página da Cielo vê a situação atualizada (consulta limitada a uma vez por minuto).
-        if (i.Ativa && i.Pagamento == StatusPagamento.Pendente && i.CieloLinkId is not null)
+        if (i.Ativa && i.Pagamento == StatusPagamento.Pendente && (i.CieloLinkId is not null || i.PedidoId is not null))
         {
             try { await pagamentos.SincronizarAsync(i); }
             catch (Exception ex) { log.LogWarning(ex, "Falha ao consultar a Cielo para o ingresso {Codigo}", i.Codigo); }
         }
         ViewBag.Link = $"{Request.Scheme}://{Request.Host}/ingresso/{i.Codigo}";
-        ViewBag.Online = pagamentos.Online;
+        ViewBag.Online = i.PedidoId is null ? pagamentos.Cartao : pagamentos.Online;
+        // Ingresso comprado junto com outros: o pagamento é do pedido inteiro.
+        if (i.PedidoId is { } pid)
+            ViewBag.Pedido = await db.Pedidos.Include(x => x.Inscricoes).FirstOrDefaultAsync(x => x.Id == pid);
         return View(i);
     }
 

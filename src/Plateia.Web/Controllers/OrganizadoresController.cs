@@ -15,7 +15,7 @@ namespace Plateia.Web.Controllers;
 public class OrganizadoresController(AppDbContext db, IPasswordHasher<Usuario> hasher) : BaseController
 {
     [HttpGet("/organizadores")]
-    public async Task<IActionResult> Index() => View(await db.Usuarios.OrderBy(u => u.Aprovado).ThenByDescending(u => u.Ativo).ThenBy(u => u.Nome)
+    public async Task<IActionResult> Index() => View(await db.Usuarios.Where(u => u.Perfil != Perfil.Participante).OrderBy(u => u.Aprovado).ThenByDescending(u => u.Ativo).ThenBy(u => u.Nome)
         .Select(u => new OrganizadorLinha(u.Id, u.Nome, u.Email, u.Telefone, u.Perfil, u.Ativo, db.Eventos.Count(e => e.OrganizadorId == u.Id),
             u.Aprovado, u.NomePublico, u.Slug, u.Cidade))
         .ToListAsync());

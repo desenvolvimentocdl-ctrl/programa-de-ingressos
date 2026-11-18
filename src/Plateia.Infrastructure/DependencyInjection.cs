@@ -22,6 +22,11 @@ public static class DependencyInjection
         services.Configure<CieloOptions>(config.GetSection("Cielo"));
         services.AddHttpClient<IPagamentoOnline, CieloLinkPagamento>(c => c.Timeout = TimeSpan.FromSeconds(30));
 
+        services.Configure<Email.EmailOptions>(config.GetSection("Email"));
+        services.AddSingleton<IEnvioEmail, Email.SmtpEnvioEmail>();
+        services.AddHttpClient<IPagamentoPix, CieloPix>(c => c.Timeout = TimeSpan.FromSeconds(30));
+
+        services.AddScoped<CodigoService>();
         services.AddScoped<EventoService>();
         services.AddScoped<InscricaoService>();
         services.AddScoped<PagamentoService>();

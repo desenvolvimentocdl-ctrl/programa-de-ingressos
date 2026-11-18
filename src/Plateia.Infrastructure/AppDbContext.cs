@@ -13,6 +13,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Cupom> Cupons => Set<Cupom>();
     public DbSet<EspacoEvento> Espacos => Set<EspacoEvento>();
     public DbSet<VisitaEvento> Visitas => Set<VisitaEvento>();
+    public DbSet<Pedido> Pedidos => Set<Pedido>();
+    public DbSet<LoginExterno> LoginsExternos => Set<LoginExterno>();
+    public DbSet<CodigoEmail> CodigosEmail => Set<CodigoEmail>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -31,6 +34,51 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => x.Email).IsUnique();
             e.HasIndex(x => x.Slug).IsUnique();
             e.Ignore(x => x.NomeExibicao);
+            e.Ignore(x => x.TemSenha);
+            e.HasMany(x => x.Logins).WithOne(x => x.Usuario!).HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<CodigoEmail>(e =>
+        {
+            e.ToTable("CodigosEmail");
+            e.Property(x => x.Email).HasMaxLength(180);
+            e.Property(x => x.Hash).HasMaxLength(100);
+            e.HasIndex(x => new { x.Email, x.Finalidade });
+        });
+
+        b.Entity<LoginExterno>(e =>
+        {
+            e.ToTable("LoginsExternos");
+            e.Property(x => x.Provedor).HasMaxLength(20);
+            e.Property(x => x.Chave).HasMaxLength(200);
+            e.Property(x => x.Email).HasMaxLength(180);
+            e.HasIndex(x => new { x.Provedor, x.Chave }).IsUnique();
+        });
+
+        b.Entity<Pedido>(e =>
+        {
+            e.Property(x => x.Codigo).HasMaxLength(12);
+            e.Property(x => x.Nome).HasMaxLength(160);
+            e.Property(x => x.Email).HasMaxLength(180);
+            e.Property(x => x.Telefone).HasMaxLength(15);
+            e.Property(x => x.Total).HasPrecision(10, 2);
+            e.Property(x => x.Desconto).HasPrecision(10, 2);
+            e.Property(x => x.CieloLinkValor).HasPrecision(10, 2);
+            e.Property(x => x.PixPaymentId).HasMaxLength(64);
+            e.Property(x => x.PixCopiaCola).HasMaxLength(1000);
+            e.Property(x => x.PixValor).HasPrecision(10, 2);
+            e.Property(x => x.PixAnteriores).HasMaxLength(400);
+            e.HasIndex(x => x.PixPaymentId);
+            e.Property(x => x.CieloLinkId).HasMaxLength(64);
+            e.Property(x => x.CieloLinkUrl).HasMaxLength(300);
+            e.Property(x => x.CieloPedido).HasMaxLength(64);
+            e.HasIndex(x => x.Codigo).IsUnique();
+            e.HasIndex(x => x.CieloLinkId);
+            e.HasIndex(x => x.CieloPedido);
+            e.HasIndex(x => x.EventoId);
+            e.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Inscricoes).WithOne(x => x.Pedido!).HasForeignKey(x => x.PedidoId).OnDelete(DeleteBehavior.SetNull);
+            e.Ignore(x => x.APagar);
         });
 
         b.Entity<Evento>(e =>
@@ -70,6 +118,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Descricao).HasMaxLength(300);
             e.Property(x => x.Preco).HasPrecision(10, 2);
             e.Ignore(x => x.Gratuito);
+            e.Ignore(x => x.PrecoMeia);
             e.HasOne(x => x.Espaco).WithMany().HasForeignKey(x => x.EspacoId).OnDelete(DeleteBehavior.SetNull);
         });
 

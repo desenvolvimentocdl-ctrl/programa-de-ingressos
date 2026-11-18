@@ -21,6 +21,12 @@ public class CieloOptions
     public int MaxParcelas { get; set; } = 1;
     /// <summary>Chave secreta exigida no endereço de notificação (?chave=...). Opcional, mas recomendada.</summary>
     public string ChaveNotificacao { get; set; } = "";
+
+    // API E-commerce Cielo 3.0 (Pix na própria página). Credenciais: Backoffice Cielo → Configurações → Dados cadastrais.
+    public string MerchantId { get; set; } = "";
+    public string MerchantKey { get; set; } = "";
+    /// <summary>true = ambiente de testes da Cielo (sandbox), com credenciais de sandbox.</summary>
+    public bool Sandbox { get; set; }
 }
 
 /// <summary>

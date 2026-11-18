@@ -22,6 +22,46 @@ namespace Plateia.Infrastructure.Migrations
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
+            modelBuilder.Entity("Plateia.Domain.CodigoEmail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("varchar(180)");
+
+                    b.Property<DateTime>("ExpiraEm")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Finalidade")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int>("Tentativas")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UsadoEm")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email", "Finalidade");
+
+                    b.ToTable("CodigosEmail", (string)null);
+                });
+
             modelBuilder.Entity("Plateia.Domain.Cupom", b =>
                 {
                     b.Property<int>("Id")
@@ -191,6 +231,12 @@ namespace Plateia.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)");
 
+                    b.Property<bool>("TemLotes")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("TemMeia")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<string>("Titulo")
                         .IsRequired()
                         .HasMaxLength(160)
@@ -274,6 +320,9 @@ namespace Plateia.Infrastructure.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("varchar(40)");
 
+                    b.Property<bool>("Meia")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasMaxLength(160)
@@ -291,6 +340,9 @@ namespace Plateia.Infrastructure.Migrations
 
                     b.Property<DateTime?>("PagoEm")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("PedidoId")
+                        .HasColumnType("int");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
@@ -317,6 +369,8 @@ namespace Plateia.Infrastructure.Migrations
 
                     b.HasIndex("CupomId");
 
+                    b.HasIndex("PedidoId");
+
                     b.HasIndex("TipoIngressoId");
 
                     b.HasIndex("EventoId", "Email");
@@ -326,6 +380,142 @@ namespace Plateia.Infrastructure.Migrations
                     b.ToTable("Inscricoes");
                 });
 
+            modelBuilder.Entity("Plateia.Domain.LoginExterno", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Chave")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(180)
+                        .HasColumnType("varchar(180)");
+
+                    b.Property<string>("Provedor")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.HasIndex("Provedor", "Chave")
+                        .IsUnique();
+
+                    b.ToTable("LoginsExternos", (string)null);
+                });
+
+            modelBuilder.Entity("Plateia.Domain.Pedido", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CieloConsultadoEm")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CieloLinkId")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("CieloLinkUrl")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<decimal?>("CieloLinkValor")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("CieloPedido")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("varchar(12)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("Desconto")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("varchar(180)");
+
+                    b.Property<int>("EventoId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)");
+
+                    b.Property<string>("PixAnteriores")
+                        .HasMaxLength(400)
+                        .HasColumnType("varchar(400)");
+
+                    b.Property<DateTime?>("PixConsultadoEm")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("PixCopiaCola")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<DateTime?>("PixGeradoEm")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("PixPaymentId")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<decimal?>("PixValor")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("Telefone")
+                        .HasMaxLength(15)
+                        .HasColumnType("varchar(15)");
+
+                    b.Property<decimal>("Total")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CieloLinkId");
+
+                    b.HasIndex("CieloPedido");
+
+                    b.HasIndex("Codigo")
+                        .IsUnique();
+
+                    b.HasIndex("EventoId");
+
+                    b.HasIndex("PixPaymentId");
+
+                    b.ToTable("Pedidos");
+                });
+
             modelBuilder.Entity("Plateia.Domain.TipoIngresso", b =>
                 {
                     b.Property<int>("Id")
@@ -333,6 +523,9 @@ namespace Plateia.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("AbreAposAnterior")
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<bool>("Ativo")
                         .HasColumnType("tinyint(1)");
@@ -355,6 +548,9 @@ namespace Plateia.Infrastructure.Migrations
                     b.Property<int>("Ordem")
                         .HasColumnType("int");
 
+                    b.Property<bool>("PermiteMeia")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<decimal>("Preco")
                         .HasPrecision(10, 2)
                         .HasColumnType("decimal(10,2)");
@@ -363,6 +559,9 @@ namespace Plateia.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("VendasAte")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("VendasDe")
                         .HasColumnType("datetime(6)");
 
                     b.HasKey("Id");
@@ -403,6 +602,9 @@ namespace Plateia.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(180)
                         .HasColumnType("varchar(180)");
+
+                    b.Property<bool>("EmailConfirmado")
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<string>("Instagram")
                         .HasMaxLength(60)
@@ -524,6 +726,11 @@ namespace Plateia.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Plateia.Domain.Pedido", "Pedido")
+                        .WithMany("Inscricoes")
+                        .HasForeignKey("PedidoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Plateia.Domain.TipoIngresso", "TipoIngresso")
                         .WithMany()
                         .HasForeignKey("TipoIngressoId")
@@ -534,7 +741,31 @@ namespace Plateia.Infrastructure.Migrations
 
                     b.Navigation("Evento");
 
+                    b.Navigation("Pedido");
+
                     b.Navigation("TipoIngresso");
+                });
+
+            modelBuilder.Entity("Plateia.Domain.LoginExterno", b =>
+                {
+                    b.HasOne("Plateia.Domain.Usuario", "Usuario")
+                        .WithMany("Logins")
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("Plateia.Domain.Pedido", b =>
+                {
+                    b.HasOne("Plateia.Domain.Evento", "Evento")
+                        .WithMany()
+                        .HasForeignKey("EventoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Evento");
                 });
 
             modelBuilder.Entity("Plateia.Domain.TipoIngresso", b =>
@@ -573,6 +804,16 @@ namespace Plateia.Infrastructure.Migrations
                     b.Navigation("Inscricoes");
 
                     b.Navigation("Tipos");
+                });
+
+            modelBuilder.Entity("Plateia.Domain.Pedido", b =>
+                {
+                    b.Navigation("Inscricoes");
+                });
+
+            modelBuilder.Entity("Plateia.Domain.Usuario", b =>
+                {
+                    b.Navigation("Logins");
                 });
 #pragma warning restore 612, 618
         }

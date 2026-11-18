@@ -915,3 +915,120 @@ body.publico .topo-publico { grid-template-columns: auto auto minmax(0, 1fr) aut
 @keyframes aparecer { from { opacity: 0; } }
 /* backdrop-filter prende elementos fixed dentro do cabeçalho: desliga enquanto a gaveta está aberta */
 body.publico .topo-publico:has(.drop.gaveta[open]) { backdrop-filter: none; background: var(--bg); }
+
+/* ==========================================================================
+   Checkout (vários ingressos num pedido) e pedido
+   ========================================================================== */
+.checkout fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.checkout .passo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; margin-bottom: 10px; padding: 0; }
+.checkout .passo span { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--texto); color: var(--bg); font: 700 12px var(--mono); }
+.bloco-checkout { display: grid; gap: 12px; padding-top: 14px !important; border-top: 1px dashed var(--linha) !important; }
+.opcao.qtd { grid-template-columns: 1fr auto; cursor: default; }
+.opcao.qtd .preco { display: block; margin-top: 4px; font: 700 15px var(--mono); }
+.opcao.qtd.marcada { border-color: var(--texto); background: var(--sup-2); }
+.contador { display: inline-flex; align-items: center; gap: 4px; }
+.contador .btn { width: 36px; height: 36px; padding: 0; font-size: 18px; border-radius: 50%; --c: var(--sup); }
+.contador output { min-width: 26px; text-align: center; font: 700 16px var(--mono); }
+.participantes { display: grid; gap: 10px; }
+.participante { display: grid; gap: 10px; padding: 14px !important; border-radius: 14px; border: 1.5px solid var(--linha) !important; background: var(--sup); }
+.participante legend { display: flex; justify-content: space-between; gap: 8px; width: 100%; float: left; font-size: 14px; font-weight: 700; }
+.participante legend small { color: var(--suave); font-weight: 600; }
+.participante .campos { display: grid; gap: 10px; }
+.participante:has(input[data-meu]:checked) .campos { display: none; }
+.participante .linha2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.total-checkout { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 2px 0; border-top: 1px dashed var(--linha); font-weight: 600; color: var(--suave); }
+.total-checkout b { font: 700 22px var(--mono); color: var(--texto); }
+@media (max-width: 480px) { .participante .linha2 { grid-template-columns: 1fr; } }
+
+.pagina-pedido { max-width: 640px; margin: 0 auto; padding: 24px 16px 64px; display: grid; gap: 18px; }
+.pedido-cab { padding: 22px 24px; display: grid; gap: 6px; border-radius: var(--raio); }
+.pedido-cab .display { font-size: clamp(30px, 6vw, 44px); }
+.pedido-cab .linha { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-weight: 600; font-size: 14px; }
+.lista-pedido { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.lista-pedido li a { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; padding: 14px 16px; border-radius: 14px; background: var(--sup); border: 1px solid var(--linha); color: inherit; text-decoration: none; transition: border-color .2s; }
+.lista-pedido li a:hover { border-color: var(--texto); }
+.lista-pedido .num { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--sup-2); font: 700 13px var(--mono); }
+.lista-pedido small { display: block; color: var(--suave); font-size: 13px; }
+.lista-pedido .lado { text-align: right; display: grid; gap: 4px; justify-items: end; font: 600 14px var(--mono); }
+.lista-pedido li.cancelado { opacity: .55; }
+.resumo-pedido { display: grid; gap: 6px; padding: 16px 18px; border-radius: 14px; background: var(--sup); border: 1px solid var(--linha); font-size: 14px; }
+.resumo-pedido div { display: flex; justify-content: space-between; gap: 12px; }
+.resumo-pedido .total { font-weight: 700; font-size: 16px; padding-top: 6px; border-top: 1px dashed var(--linha); }
+.aviso-pedido { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; border-radius: 14px; background: var(--sup-2); font-size: 14px; }
+
+/* Entrar com Google, Apple e Microsoft */
+.sociais { display: grid; gap: 10px; }
+.btn-social { --c: var(--sup-2); width: 100%; height: 48px; gap: 10px; font-size: 15px; }
+.btn-social svg { width: 20px; height: 20px; flex: none; }
+.btn-social.apple { --c: #fff; --t: #000; }
+.ou { display: flex; align-items: center; gap: 12px; color: var(--apagado); font-size: 13px; }
+.ou::before, .ou::after { content: ""; flex: 1; height: 1px; background: var(--linha); }
+.login-caixa { width: min(380px, 100%); display: grid; gap: 16px; }
+.login-form .login-caixa form { width: 100%; }
+/* Formulário do evento: meia-entrada, virada de lote e início das vendas */
+.tipo-linha .tipo-extras { grid-column: 1 / -1; order: 10; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-top: 10px; border-top: 1px dashed var(--linha); }
+@media (max-width: 760px) { .tipo-linha .tipo-extras { grid-template-columns: 1fr; } }
+.opcao.qtd.meia { margin-top: -4px; border-style: dashed; }
+.opcao .em-breve { color: #9A4A1C; font-weight: 600; }
+.participante .aviso-meia { color: #9A4A1C; font-size: 12px; font-weight: 600; }
+
+/* Pagamento do pedido: Pix na página e cartão na Cielo */
+.pagamento { display: grid; gap: 14px; padding: 20px; border-radius: 18px; background: var(--sup); border: 1px solid var(--linha); box-shadow: var(--sombra); }
+.pagamento-topo { display: grid; gap: 2px; }
+.pagamento-topo b { font: 400 30px/1 var(--display); text-transform: uppercase; }
+.pagamento-topo span { color: var(--suave); font-size: 14px; }
+.abas-pagamento { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; position: relative; }
+.abas-pagamento.duas { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.abas-pagamento > input { position: absolute; opacity: 0; pointer-events: none; }
+.abas-pagamento > label { text-align: center; padding: 12px; border-radius: 12px; border: 1.5px solid var(--linha); font-weight: 700; cursor: pointer; grid-row: 1; }
+.abas-pagamento > input:checked + label { border-color: var(--texto); background: var(--sup-2); }
+.abas-pagamento > input:focus-visible + label { outline: 2px solid var(--texto); outline-offset: 2px; }
+.painel-forma { display: none; grid-column: 1 / -1; gap: 12px; padding-top: 6px; }
+#forma-pix:checked ~ .painel-pix, #forma-cartao:checked ~ .painel-cartao { display: grid; }
+.qr-pix { width: min(240px, 70vw); justify-self: center; padding: 14px; background: #fff; border-radius: 14px; border: 1px solid var(--linha); }
+.qr-pix svg { display: block; width: 100%; height: auto; }
+.copia-cola { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.copia-cola input { font: 12px var(--mono) !important; }
+body.publico .copia-cola .btn.pri { width: auto; }
+.form-pix { display: grid; gap: 12px; }
+.aguardando { display: flex; gap: 10px; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: var(--suave); text-align: center; }
+.aguardando .pulso { width: 10px; height: 10px; border-radius: 50%; background: #11834F; flex: none; animation: pulso 1.6s ease-out infinite; }
+@media (max-width: 480px) { .copia-cola { grid-template-columns: 1fr; } }
+
+/* Menu: Entrar (contorno) + Cadastre-se (cheio) */
+body.publico .nav-publico .btn.entrar { --c: transparent; --t: var(--texto); border-color: var(--linha); }
+body.publico .nav-publico .btn.entrar:hover { border-color: var(--texto); }
+.gaveta-painel > .btn { width: 100%; margin: 2px 0; }
+
+/* Conta do público: confirmar e-mail, Meus ingressos, virar produtor */
+.pagina-conta { max-width: 1100px; margin: 0 auto; padding: clamp(24px, 4vw, 48px) 16px 72px; display: grid; gap: 22px; }
+.secao-conta { display: grid; gap: 16px; padding: clamp(20px, 4vw, 32px); border-radius: var(--raio); background: var(--sup); border: 1px solid var(--linha); box-shadow: var(--sombra); width: 100%; }
+.cabeca-conta { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; }
+.cabeca-conta .display { font-size: clamp(40px, 6vw, 64px); }
+body.publico .cabeca-conta .btn { --c: var(--sup); }
+.vazio-conta { display: grid; gap: 10px; justify-items: center; text-align: center; padding: 48px 20px; border-radius: var(--raio); border: 2px dashed var(--linha); }
+.titulo-grupo { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--suave); }
+.grade-meus { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: 16px; }
+.cartao-meu { display: grid; gap: 10px; align-content: start; padding: 10px 10px 14px; border-radius: var(--raio); background: var(--sup); border: 1px solid var(--linha); box-shadow: var(--sombra); }
+.cartao-meu-topo { display: grid; gap: 6px; padding: 18px; border-radius: 12px; text-decoration: none; font-size: 13px; font-weight: 600; }
+.cartao-meu-topo .display { font-size: 28px; line-height: 1; }
+.cartao-meu ul { list-style: none; margin: 0; padding: 0 4px; display: grid; gap: 6px; }
+.cartao-meu li a { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--sup-2); color: inherit; text-decoration: none; }
+.cartao-meu li a:hover { background: var(--sup-3); }
+.cartao-meu li small { display: block; color: var(--suave); font-size: 12px; }
+.cartao-meu li b + small { display: inline; }
+.cartao-meu li.cancelado { opacity: .55; }
+body.publico .cartao-meu > .btn.pri { margin: 0 4px; width: auto; }
+.campo-codigo { font: 700 24px var(--mono) !important; letter-spacing: .3em; text-align: center; }
+
+/* Meia-entrada e lotes: só aparecem quando o produtor liga a opção no evento */
+.escolhas-evento { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.escolha { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 14px; border: 1.5px solid var(--linha); cursor: pointer; }
+.escolha:has(input:checked) { border-color: var(--acento); background: color-mix(in srgb, var(--acento) 8%, transparent); }
+.escolha input { margin-top: 2px; flex: none; }
+.escolha b { display: block; font-size: 15px; }
+.escolha small { color: var(--suave); font-size: 13px; }
+.form-evento:not(:has(input[name=tem_meia]:checked)) .so-meia,
+.form-evento:not(:has(input[name=tem_lotes]:checked)) .so-lotes { display: none; }
+.form-evento:not(:has(input[name=tem_meia]:checked)):not(:has(input[name=tem_lotes]:checked)) .tipo-extras { display: none; }
+@media (max-width: 760px) { .escolhas-evento { grid-template-columns: 1fr; } }

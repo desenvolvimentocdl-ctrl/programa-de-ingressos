@@ -28,10 +28,13 @@
         <small>Sem mensalidade para criar eventos.</small>
     </section>
     <section class="login-form">
-        <form method="post" asp-antiforgery="true" action="/criar-conta">
+        <div class="login-caixa">
             <h1>Criar conta</h1>
             <p class="suave" style="margin-top:-8px">Para quem produz palestras, cursos, encontros e shows. Seu cadastro passa por uma aprovação rápida antes da primeira publicação.</p>
             @if (ViewBag.Erro is string erro) { <div class="alerta-caixa erro" role="alert">@erro</div> }
+            @{ ViewData["TextoSocial"] = "Criar conta com"; ViewData["TipoConta"] = "produtor"; }
+            <partial name="_LoginSocial" model="(string?)null" />
+        <form method="post" asp-antiforgery="true" action="/criar-conta">
             <label class="campo">Seu nome<input name="nome" value="@f?.nome" required maxlength="120" autocomplete="name"></label>
             <label class="campo">Nome do produtor <small>como aparece para o público (empresa, coletivo, marca). Opcional.</small><input name="marca" value="@f?.marca" maxlength="120" placeholder="Ex.: Estúdio Movimento"></label>
             <div class="grade-form">
@@ -45,8 +48,10 @@
             </div>
             <label class="check"><input type="checkbox" name="aceite" value="true" required> Li e aceito os termos de uso e a política de privacidade.</label>
             <button class="btn pri grande">Criar conta</button>
-            <p class="suave" style="font-size:14px;text-align:center">Já tem conta? <a href="/entrar">Entrar</a></p>
         </form>
+            <p class="suave" style="font-size:12px;text-align:center">Ao criar a conta com Google, Apple ou Microsoft, você aceita os termos de uso e a política de privacidade.</p>
+            <p class="suave" style="font-size:14px;text-align:center">Já tem conta? <a href="/entrar">Entrar</a></p>
+        </div>
     </section>
 </div>
 </body>

@@ -29,7 +29,7 @@ public static class Demo
             var u = new Usuario
             {
                 Nome = nome, NomePublico = marca, Email = email, Telefone = "3499" + rnd.Next(1000000, 9999999), Cidade = cidade,
-                Bio = bio, Instagram = ig, Slug = Utilidades.Slug(marca), Perfil = Perfil.Organizador, Aprovado = aprovado
+                Bio = bio, Instagram = ig, Slug = Utilidades.Slug(marca), Perfil = Perfil.Organizador, Aprovado = aprovado, EmailConfirmado = true
             };
             u.SenhaHash = hasher.HashPassword(u, "demo12345");
             db.Usuarios.Add(u);

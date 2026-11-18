@@ -17,3 +17,14 @@ public interface IPagamentoOnline
     Task<PagamentoOnline?> ConsultarLinkAsync(string linkId, CancellationToken ct = default);
     Task<PagamentoOnline?> ConsultarPedidoAsync(string pedido, CancellationToken ct = default);
 }
+
+public record PixGerado(string PaymentId, string CopiaCola);
+
+/// <summary>Pix gerado na própria página do pedido (QR Code + copia e cola), pela API E-commerce da Cielo.</summary>
+public interface IPagamentoPix
+{
+    /// <summary>Falso sem MerchantId/MerchantKey: o pedido mostra só o pagamento por cartão (ou as instruções manuais).</summary>
+    bool Configurado { get; }
+    Task<PixGerado> CriarAsync(string referencia, decimal valor, string nomePagador, string cpf, CancellationToken ct = default);
+    Task<PagamentoOnline?> ConsultarAsync(string paymentId, CancellationToken ct = default);
+}

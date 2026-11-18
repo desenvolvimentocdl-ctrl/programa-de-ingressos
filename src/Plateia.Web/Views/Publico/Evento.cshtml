@@ -7,14 +7,24 @@
     ViewData["Descricao"] = e.Subtitulo ?? $"{Hora.DataLonga(e.InicioEm)} · {e.Local}";
     if (e.Imagem is { } img) ViewData["ImagemOg"] = $"{Context.Request.Scheme}://{Context.Request.Host}{img}";
     var local = Hora.Local(e.InicioEm);
-    var form = ViewBag.Form as dynamic;
-    int? tipoEscolhido = form?.tipo;
-    var disponiveis = Model.Tipos.Where(t => !t.Esgotado && !t.Encerrado).ToList();
-    if (tipoEscolhido is null || disponiveis.All(t => t.Id != tipoEscolhido)) tipoEscolhido = disponiveis.FirstOrDefault()?.Id;
+    var form = ViewBag.Form as FormCheckout;
+    var disponiveis = Model.Tipos.Where(t => t.AVenda).ToList();
     var poucas = Model.Livres <= Math.Max(5, e.Capacidade * 0.2);
     var temPago = disponiveis.Any(t => t.Preco > 0);
-    string? cupomDigitado = form?.cupom;
+    string? cupomDigitado = form?.Cupom;
     var espacoLotado = Model.Espacos.Where(x => x.Livres <= 0).Select(x => x.Id).ToHashSet();
+    var livresEspaco = Model.Espacos.ToDictionary(x => x.Id, x => x.Livres);
+    // Quanto dá para comprar de cada tipo num pedido (limite do pedido, do tipo, do espaço e do evento).
+    int MaxDoTipo(ResumoTipo t) => new[] { InscricaoService.MaxPorPedido, Model.Livres,
+        t.Quantidade is { } q ? q - t.Vendidos : int.MaxValue,
+        t.EspacoId is { } eid && livresEspaco.TryGetValue(eid, out var le) ? le : int.MaxValue }.Min();
+    // Estado inicial do checkout: o que a pessoa já tinha preenchido, ou 1 ingresso do primeiro tipo disponível.
+    var estado = form is not null
+        ? new { participantes = form.Participantes.Select(x => new { tipo = x.TipoId, meia = x.Meia, nome = x.Nome, email = x.Email, telefone = x.Telefone, meu = x.Meu }).ToArray() }
+        : new { participantes = disponiveis.Take(1).Select(t => new { tipo = t.Id, meia = false, nome = (string?)null, email = (string?)null, telefone = (string?)null, meu = true }).ToArray() };
+    // Quem está logado já vem com os dados preenchidos.
+    var nomeComprador = form?.Nome ?? (User.Identity?.IsAuthenticated == true ? User.Identity.Name : null);
+    var emailComprador = form?.Email ?? User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
     // Ingressos agrupados por espaço (sem espaços, um grupo só).
     var grupos = Model.Espacos.Count == 0
         ? new List<(ResumoEspaco? Espaco, List<ResumoTipo> Tipos)> { (null, Model.Tipos) }
@@ -110,37 +120,71 @@
             <div class="picote" style="margin:0 18px"></div>
             @if (Model.AceitaInscricoes && disponiveis.Count > 0)
             {
-                <form method="post" asp-antiforgery="true" action="/e/@e.Slug#inscricao" id="form-inscricao" data-cupom-url="/e/@e.Slug/cupom">
+                <form method="post" asp-antiforgery="true" action="/e/@e.Slug#inscricao" id="form-inscricao" class="checkout" data-cupom-url="/e/@e.Slug/cupom"
+                      data-max="@InscricaoService.MaxPorPedido" data-livres="@Model.Livres" data-estado="@System.Text.Json.JsonSerializer.Serialize(estado)">
                     @if (ViewBag.Erro is string erro) { <div class="alerta-caixa erro" role="alert">@erro</div> }
                     @if (poucas) { <span class="restam">🔥 Restam @Model.Livres lugar(es)</span> }
                     <fieldset class="opcoes" style="border:0;padding:0;margin:0">
-                        <legend class="sr">Tipo de ingresso</legend>
+                        <legend class="passo"><span>1</span>Escolha os ingressos</legend>
                         @foreach (var (esp, tipos) in grupos)
                         {
                             @if (esp is not null) { <p class="grupo-espaco">@esp.Nome</p> }
                             @foreach (var t in tipos)
                             {
-                                var fora = t.Esgotado || t.Encerrado || (t.EspacoId is { } eid && espacoLotado.Contains(eid));
-                                <label class="opcao @(fora ? "esgotado" : "")">
-                                    <input type="radio" name="tipo" value="@t.Id" required checked="@(t.Id == tipoEscolhido && !fora ? "checked" : null)" disabled="@(fora ? "disabled" : null)">
-                                    <span>
-                                        <b>@t.Nome</b>
-                                        @if (t.Esgotado || (t.EspacoId is { } e2 && espacoLotado.Contains(e2))) { <small>Esgotado</small> }
-                                        else if (t.Encerrado) { <small>Vendas encerradas</small> }
-                                        else
+                                var lotado = t.EspacoId is { } eid && espacoLotado.Contains(eid);
+                                var fora = !t.AVenda || lotado;
+                                var maxTipo = fora ? 0 : Math.Max(0, MaxDoTipo(t));
+                                // Ingresso com meia-entrada vira duas linhas: inteira e meia (50%).
+                                var variantes = t.Meia && !fora ? new[] { false, true } : new[] { false };
+                                @foreach (var meia in variantes)
+                                {
+                                    var preco = meia ? t.PrecoMeia : t.Preco;
+                                    var rotulo = t.Meia && !fora ? $"{t.Nome} · {(meia ? "Meia-entrada" : "Inteira")}" : t.Nome;
+                                    <div class="opcao qtd @(fora ? "esgotado" : "") @(meia ? "meia" : "")" data-tipo="@t.Id" data-meia="@(meia ? 1 : 0)" data-nome="@rotulo"
+                                         data-max="@maxTipo" data-valor="@Texto.N((double)preco)">
+                                        <span>
+                                            <b>@rotulo</b>
+                                            @if (lotado || t.Esgotado) { <small>Esgotado</small> }
+                                            else if (t.Encerrado) { <small>Vendas encerradas</small> }
+                                            else if (t.Situacao == SituacaoVenda.EmBreve) { <small class="em-breve">Vendas a partir de @Hora.Local(t.VendasDe!.Value).ToString("dd/MM 'às' HH'h'mm")</small> }
+                                            else if (t.Situacao == SituacaoVenda.AguardaLote) { <small class="em-breve">Abre quando "@t.LoteAnterior" esgotar ou encerrar</small> }
+                                            else
+                                            {
+                                                @if (meia) { <small>Estudantes, idosos, PcD e demais casos da lei. Apresente o documento na entrada.</small> }
+                                                else if (t.Descricao is { } td) { <small>@td</small> }
+                                                @if (!meia && t.VendasAte is { } ate) { <span class="lote">até @Hora.Local(ate).ToString("dd/MM 'às' HH'h'mm")</span> }
+                                                @if (!meia && t.Restantes is > 0 and <= 20) { <span class="lote">últimos @t.Restantes</span> }
+                                            }
+                                            <span class="preco" data-preco="@Texto.N((double)preco)">@Texto.Preco(preco)</span>
+                                        </span>
+                                        @if (!fora)
                                         {
-                                            @if (t.Descricao is { } td) { <small>@td</small> }
-                                            @if (t.VendasAte is { } ate) { <span class="lote">até @Hora.Local(ate).ToString("dd/MM 'às' HH'h'mm")</span> }
+                                            <span class="contador">
+                                                <button type="button" class="btn" data-menos aria-label="Menos um @rotulo">−</button>
+                                                <output aria-live="polite" aria-label="Quantidade de @rotulo">0</output>
+                                                <button type="button" class="btn" data-mais aria-label="Mais um @rotulo">+</button>
+                                            </span>
                                         }
-                                    </span>
-                                    <span class="preco" data-preco="@Texto.N((double)t.Preco)">@Texto.Preco(t.Preco)</span>
-                                </label>
+                                    </div>
+                                }
                             }
                         }
                     </fieldset>
-                    <label class="campo">Nome completo<input name="nome" value="@form?.nome" required maxlength="160" autocomplete="name"></label>
-                    <label class="campo">E-mail<input type="email" name="email" value="@form?.email" required maxlength="180" autocomplete="email"></label>
-                    <label class="campo">WhatsApp <small>para avisos do evento</small><input name="telefone" value="@form?.telefone" inputmode="tel" autocomplete="tel" placeholder="(34) 9 0000-0000"></label>
+
+                    <fieldset class="bloco-checkout">
+                        <legend class="passo"><span>2</span>Seus dados</legend>
+                        <label class="campo">Nome completo<input name="nome" value="@nomeComprador" required maxlength="160" autocomplete="name"></label>
+                        <label class="campo">E-mail <small>o pedido e os ingressos ficam ligados a ele</small><input type="email" name="email" value="@emailComprador" required maxlength="180" autocomplete="email"></label>
+                        <label class="campo">WhatsApp <small>para avisos do evento</small><input name="telefone" value="@form?.Telefone" inputmode="tel" autocomplete="tel" placeholder="(34) 9 0000-0000"></label>
+                    </fieldset>
+
+                    <fieldset class="bloco-checkout" data-participantes-bloco hidden>
+                        <legend class="passo"><span>3</span>Participantes</legend>
+                        <p class="suave" style="font-size:13px;margin:0">Cada ingresso sai no nome de quem vai usar. E-mail e WhatsApp dos outros participantes são opcionais.</p>
+                        <div class="participantes" data-participantes></div>
+                    </fieldset>
+                    <noscript><div class="alerta-caixa">Ative o JavaScript do navegador para escolher a quantidade de ingressos.</div></noscript>
+
                     @if (Model.TemCupons && temPago)
                     {
                         <div class="campo">Cupom de desconto <small>opcional</small>
@@ -152,7 +196,8 @@
                         </div>
                     }
                     <input type="hidden" name="canal" value="@Model.Canal">
-                    <button class="btn pri grande">Confirmar inscrição</button>
+                    <div class="total-checkout" data-total hidden><span data-total-qtd></span><b data-total-valor></b></div>
+                    <button class="btn pri grande" data-finalizar>Confirmar inscrição</button>
                     @if (temPago && Model.PagamentoOnline)
                     {
                         <p class="selo-cielo"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Pagamento seguro pela Cielo: cartão ou Pix</p>
@@ -166,7 +211,7 @@
             else
             {
                 <div class="fechado">
-                    <b>@(e.Status switch { StatusEvento.Encerrado => "Evento encerrado", StatusEvento.Cancelado => "Evento cancelado", _ => Model.Livres <= 0 || Model.Tipos.All(t => t.Esgotado) ? "Esgotado" : "Inscrições fechadas" })</b>
+                    <b>@(e.Status switch { StatusEvento.Encerrado => "Evento encerrado", StatusEvento.Cancelado => "Evento cancelado", _ => Model.Livres <= 0 || Model.Tipos.All(t => t.Esgotado) ? "Esgotado" : Model.Tipos.Any(t => t.Situacao == SituacaoVenda.EmBreve) && e.InscricoesAbertas ? "Vendas em breve" : "Inscrições fechadas" })</b>
                     <p class="suave">@(e.Status == StatusEvento.Encerrado ? "Obrigado a quem participou!" : "Fale com o produtor para saber se abrirão novas vagas.")</p>
                 </div>
             }

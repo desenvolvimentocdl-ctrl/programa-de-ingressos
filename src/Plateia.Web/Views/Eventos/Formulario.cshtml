@@ -97,7 +97,17 @@
 
         <section class="secao">
             <h2>Ingressos</h2>
-            <p>Preço zero = gratuito. Quantidade em branco = só a lotação. Para lotes, crie um tipo por lote ("1º lote", "2º lote") com a data em que as vendas acabam.</p>
+            <p>Preço zero = gratuito. Quantidade em branco = só a lotação.</p>
+            <div class="escolhas-evento">
+                <label class="escolha">
+                    <input type="checkbox" name="tem_meia" value="true" checked="@(Model.TemMeia ? "checked" : null)">
+                    <span><b>Este evento tem meia-entrada</b><small>Você escolhe em quais ingressos. O comprador escolhe entre inteira e meia (50%) e apresenta o documento na entrada.</small></span>
+                </label>
+                <label class="escolha">
+                    <input type="checkbox" name="tem_lotes" value="true" checked="@(Model.TemLotes ? "checked" : null)">
+                    <span><b>Este evento vende em lotes</b><small>Crie um ingresso por lote ("1º lote", "2º lote"…). Cada um pode ter início e fim das vendas e abrir sozinho quando o de cima esgotar.</small></span>
+                </label>
+            </div>
             <div id="tipos" style="display:grid;gap:10px">
                 @foreach (var t in Model.Tipos)
                 {
@@ -111,7 +121,12 @@
                         <button type="button" class="btn fantasma ico" data-remover-tipo title="Remover" aria-label="Remover tipo de ingresso" style="margin-bottom:4px">×</button>
                         <label class="campo esp">Espaço<select name="tipo_espaco" data-espaco-atual="@atual"></select></label>
                         <label class="campo desc">Detalhe <small>opcional</small><input name="tipo_desc" value="@t.Descricao" maxlength="300" placeholder="Ex.: válido para estudantes com carteirinha"></label>
-                        <label class="campo ate">Vendas até <small>opcional · para lotes</small><input type="datetime-local" name="tipo_ate" value="@Hora.Input(t.VendasAte)"></label>
+                        <label class="campo ate so-lotes">Vendas até <small>opcional · para lotes</small><input type="datetime-local" name="tipo_ate" value="@Hora.Input(t.VendasAte)"></label>
+                        <div class="tipo-extras">
+                            <label class="campo so-meia">Meia-entrada<select name="tipo_meia"><option value="0">Não tem</option><option value="1" selected="@(t.PermiteMeia ? "selected" : null)">Tem meia (50% do preço)</option></select></label>
+                            <label class="campo so-lotes">Virada de lote<select name="tipo_sequencia"><option value="0">Vende desde já</option><option value="1" selected="@(t.AbreAposAnterior ? "selected" : null)">Abre quando o de cima esgotar ou encerrar</option></select></label>
+                            <label class="campo so-lotes">Vendas a partir de <small>opcional</small><input type="datetime-local" name="tipo_de" value="@Hora.Input(t.VendasDe)"></label>
+                        </div>
                     </div>
                 }
             </div>
@@ -176,7 +191,12 @@
         <button type="button" class="btn fantasma ico" data-remover-tipo title="Remover" aria-label="Remover tipo de ingresso" style="margin-bottom:4px">×</button>
         <label class="campo esp">Espaço<select name="tipo_espaco" data-espaco-atual=""></select></label>
         <label class="campo desc">Detalhe <small>opcional</small><input name="tipo_desc" maxlength="300"></label>
-        <label class="campo ate">Vendas até <small>opcional · para lotes</small><input type="datetime-local" name="tipo_ate"></label>
+        <label class="campo ate so-lotes">Vendas até <small>opcional · para lotes</small><input type="datetime-local" name="tipo_ate"></label>
+        <div class="tipo-extras">
+            <label class="campo so-meia">Meia-entrada<select name="tipo_meia"><option value="0">Não tem</option><option value="1">Tem meia (50% do preço)</option></select></label>
+            <label class="campo so-lotes">Virada de lote<select name="tipo_sequencia"><option value="0">Vende desde já</option><option value="1">Abre quando o de cima esgotar ou encerrar</option></select></label>
+            <label class="campo so-lotes">Vendas a partir de <small>opcional</small><input type="datetime-local" name="tipo_de"></label>
+        </div>
     </div>
 </template>
 <template id="modelo-espaco">

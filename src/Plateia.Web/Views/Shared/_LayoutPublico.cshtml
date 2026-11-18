@@ -22,6 +22,8 @@
 <body class="publico" style="--cor:@cor;--tinta:@tinta">
 @RenderSection("Topo", required: false)
 <partial name="_MenuPublico" />
+@if (TempData["msg"] is string msg) { <div class="toast" role="status">@msg</div> }
+@if (TempData["erro"] is string erroTopo && ViewData["ErroNaPagina"] is null) { <div class="toast erro" role="alert">@erroTopo</div> }
 @RenderBody()
 <footer class="rodape-publico">
     <div class="rodape-grade">

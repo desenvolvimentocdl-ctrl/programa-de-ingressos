@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Plateia.Application;
 
 public record DadosTipo(int? Id, string Nome, string? Descricao, decimal Preco, int? Quantidade, bool Remover,
-    DateTime? VendasAteUtc = null, string? EspacoChave = null);
+    DateTime? VendasAteUtc = null, string? EspacoChave = null, DateTime? VendasDeUtc = null, bool AbreAposAnterior = false, bool PermiteMeia = false);
 
 /// <summary>Chave liga o espaço aos tipos no formulário: "e12" para um espaço já salvo, "n0", "n1"… para novos.</summary>
 public record DadosEspaco(string Chave, int? Id, string Nome, string? Descricao, int Capacidade, bool Remover);
@@ -15,7 +15,7 @@ public record DadosEvento(
     string Titulo, string? Subtitulo, string? Descricao, CategoriaEvento Categoria, LocalEvento Onde, string? Classificacao,
     DateTime InicioUtc, DateTime? FimUtc, int Capacidade, string Cor, StatusEvento Status,
     bool InscricoesAbertas, string? InstrucoesPagamento, int? OrganizadorId, List<DadosEspaco> Espacos, List<DadosTipo> Tipos,
-    bool? Destaque = null);
+    bool? Destaque = null, bool TemMeia = false, bool TemLotes = false);
 
 public class EventoService(IAppDbContext db)
 {
@@ -79,6 +79,8 @@ public class EventoService(IAppDbContext db)
         e.Cor = d.Cor.ToUpperInvariant();
         e.Status = d.Status;
         e.InscricoesAbertas = d.InscricoesAbertas;
+        e.TemMeia = d.TemMeia;
+        e.TemLotes = d.TemLotes;
         e.InstrucoesPagamento = Utilidades.Limpo(d.InstrucoesPagamento, 2000);
         if (eu.Admin && d.Destaque is { } dest) e.Destaque = dest;
 
@@ -94,6 +96,12 @@ public class EventoService(IAppDbContext db)
         }
 
         await AplicarTiposAsync(e, d.Tipos, espacos);
+        // Meia-entrada e lotes só valem quando o produtor ligou a opção no evento.
+        foreach (var t in e.Tipos)
+        {
+            if (!e.TemMeia) t.PermiteMeia = false;
+            if (!e.TemLotes) { t.AbreAposAnterior = false; t.VendasDe = null; t.VendasAte = null; }
+        }
         if (!e.Tipos.Any(t => t.Ativo)) throw new RegraNegocioException("Cadastre pelo menos um tipo de ingresso.");
 
         await db.SaveChangesAsync();
@@ -171,7 +179,13 @@ public class EventoService(IAppDbContext db)
             tipo.Descricao = Utilidades.Limpo(t.Descricao, 300);
             tipo.Preco = Math.Round(t.Preco, 2);
             tipo.Quantidade = t.Quantidade;
+            if (t.VendasDeUtc is { } de && t.VendasAteUtc is { } ate && ate <= de)
+                throw new RegraNegocioException($"Em \"{nome}\", o fim das vendas precisa ser depois do início.");
             tipo.VendasAte = t.VendasAteUtc;
+            tipo.VendasDe = t.VendasDeUtc;
+            // O primeiro ingresso da lista não tem "anterior" para esperar.
+            tipo.AbreAposAnterior = t.AbreAposAnterior && ordem > 0;
+            tipo.PermiteMeia = t.PermiteMeia && t.Preco > 0;
             // Com espaços cadastrados, todo tipo pertence a um (se não escolheu, vai para o primeiro).
             var esp = t.EspacoChave is { } ch && espacos.TryGetValue(ch, out var achado) ? achado : espacos.Values.FirstOrDefault();
             tipo.Espaco = esp;
@@ -193,12 +207,13 @@ public class EventoService(IAppDbContext db)
             Local = o.Local, Endereco = o.Endereco, Bairro = o.Bairro, Cidade = o.Cidade, Uf = o.Uf, Cep = o.Cep, LinkOnline = o.LinkOnline,
             Categoria = o.Categoria, Formato = o.Formato, Classificacao = o.Classificacao, Imagem = o.Imagem,
             InicioEm = o.InicioEm, FimEm = o.FimEm, Capacidade = o.Capacidade, Cor = o.Cor,
-            Status = StatusEvento.Rascunho, InscricoesAbertas = true, InstrucoesPagamento = o.InstrucoesPagamento, OrganizadorId = o.OrganizadorId,
+            Status = StatusEvento.Rascunho, InscricoesAbertas = true, TemMeia = o.TemMeia, TemLotes = o.TemLotes, InstrucoesPagamento = o.InstrucoesPagamento, OrganizadorId = o.OrganizadorId,
         };
         var copias = o.Espacos.ToDictionary(x => x.Id, x => new EspacoEvento { Nome = x.Nome, Descricao = x.Descricao, Capacidade = x.Capacidade, Ordem = x.Ordem });
         e.Espacos = copias.Values.ToList();
         e.Tipos = o.Tipos.Where(t => t.Ativo).OrderBy(t => t.Ordem)
             .Select(t => new TipoIngresso { Nome = t.Nome, Descricao = t.Descricao, Preco = t.Preco, Quantidade = t.Quantidade, Ordem = t.Ordem,
+                AbreAposAnterior = t.AbreAposAnterior, PermiteMeia = t.PermiteMeia,
                 Espaco = t.EspacoId is { } eid && copias.TryGetValue(eid, out var c) ? c : null }).ToList();
         db.Eventos.Add(e);
         await db.SaveChangesAsync();

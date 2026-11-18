@@ -18,6 +18,33 @@ namespace Plateia.Web.Controllers;
 [AllowAnonymous, IgnoreAntiforgeryToken]
 public class CieloController(PagamentoService pagamentos, IOptions<CieloOptions> opcoes, ILogger<CieloController> log) : Controller
 {
+    /// <summary>
+    /// Aviso da API E-commerce (Pix). Peça ao suporte da Cielo para cadastrar:
+    ///   https://SEU-DOMINIO/cielo/pix/notificacao?chave=CHAVE
+    /// Corpo JSON: { "PaymentId": "...", "ChangeType": 1 }. A situação é confirmada consultando a Cielo.
+    /// </summary>
+    [HttpPost("/cielo/pix/notificacao")]
+    public async Task<IActionResult> AvisoPix(string? chave)
+    {
+        var esperada = opcoes.Value.ChaveNotificacao;
+        if (esperada.Length > 0 && !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(chave ?? ""), Encoding.UTF8.GetBytes(esperada)))
+            return Unauthorized();
+        string? paymentId = null;
+        try
+        {
+            var j = await System.Text.Json.JsonSerializer.DeserializeAsync<System.Text.Json.JsonElement>(Request.Body);
+            if (j.TryGetProperty("PaymentId", out var v)) paymentId = v.GetString();
+            if (!await pagamentos.ProcessarAvisoPixAsync(paymentId)) log.LogWarning("Aviso de Pix não reconhecido ({Id})", paymentId);
+            return Ok();
+        }
+        catch (System.Text.Json.JsonException) { return Ok(); }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao processar aviso de Pix ({Id})", paymentId);
+            return StatusCode(500);
+        }
+    }
+
     [HttpPost("/cielo/notificacao"), HttpPost("/cielo/status")]
     public async Task<IActionResult> Aviso(string? chave)
     {

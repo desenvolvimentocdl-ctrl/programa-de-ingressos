@@ -1,0 +1,65 @@
+@model PaginaMeusIngressos
+@{
+    Layout = "_LayoutPublico";
+    ViewData["Title"] = "Meus ingressos · Plateia";
+    var agora = DateTime.UtcNow;
+    var email = Model.Usuario.Email;
+    // Agrupa por evento: próximos primeiro (do mais perto ao mais longe), depois os que já passaram.
+    var grupos = Model.Itens.GroupBy(i => i.Evento!).Select(g => (Evento: g.Key, Itens: g.OrderBy(i => i.Status).ThenBy(i => i.Nome).ToList())).ToList();
+    var proximos = grupos.Where(g => (g.Evento.FimEm ?? g.Evento.InicioEm) >= agora).OrderBy(g => g.Evento.InicioEm).ToList();
+    var passados = grupos.Where(g => (g.Evento.FimEm ?? g.Evento.InicioEm) < agora).OrderByDescending(g => g.Evento.InicioEm).ToList();
+}
+<div class="pagina-conta">
+    <div class="cabeca-conta">
+        <div>
+            <h1 class="display">Meus ingressos</h1>
+            <p class="suave">Ingressos em seu nome e os que você comprou para outras pessoas (@email).</p>
+        </div>
+        <a class="btn" href="/eventos">Explorar eventos</a>
+    </div>
+
+    @if (grupos.Count == 0)
+    {
+        <div class="vazio-conta">
+            <b>Nenhum ingresso por aqui ainda.</b>
+            <p class="suave">Quando você comprar com o e-mail @email, os ingressos aparecem aqui.</p>
+            <a class="btn pri" href="/eventos" style="width:auto">Encontrar um evento</a>
+        </div>
+    }
+
+    @foreach (var (titulo, lista) in new[] { ("Próximos", proximos), ("Já aconteceram", passados) })
+    {
+        if (lista.Count == 0) { continue; }
+        <h2 class="titulo-grupo">@titulo</h2>
+        <div class="grade-meus">
+            @foreach (var (ev, itens) in lista)
+            {
+                var pedidosPendentes = itens.Where(i => i.Ativa && i.Pagamento == StatusPagamento.Pendente && i.Pedido is not null).Select(i => i.Pedido!).DistinctBy(p => p.Id).ToList();
+                <article class="cartao-meu" style="--cor:@ev.Cor;--tinta:@Texto.TintaSobre(ev.Cor)">
+                    <a class="cartao-meu-topo cartaz" href="/e/@ev.Slug">
+                        <span>@Hora.Data(ev.InicioEm)</span>
+                        <b class="display">@ev.Titulo</b>
+                        <span>@(ev.Formato == FormatoEvento.Online ? "Online" : ev.Local)</span>
+                    </a>
+                    <ul>
+                        @foreach (var i in itens)
+                        {
+                            <li class="@(i.Ativa ? "" : "cancelado")">
+                                <a href="/ingresso/@i.Codigo">
+                                    <span><b>@i.Nome</b>@if (i.Email != email || (i.Pedido?.Email == email && i.Nome != Model.Usuario.Nome)) { <small> · comprado por você</small> }<small>@i.TipoIngresso?.Nome@(i.Meia ? " (meia)" : "") · <span class="mono">@i.Codigo</span></small></span>
+                                    @if (!i.Ativa) { <span class="pilula perigo">Cancelado</span> }
+                                    else if (i.CheckinEm is not null) { <span class="pilula">Utilizado</span> }
+                                    else { <span class="pilula @Texto.ClassePagamento(i.Pagamento)">@Texto.NomePagamento(i.Pagamento)</span> }
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                    @foreach (var p in pedidosPendentes)
+                    {
+                        <a class="btn pri" href="/pedido/@p.Codigo#pagamento">Pagar pedido @p.Codigo · Pix ou cartão</a>
+                    }
+                </article>
+            }
+        </div>
+    }
+</div>

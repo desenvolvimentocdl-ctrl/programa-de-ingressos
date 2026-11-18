@@ -1,0 +1,21 @@
+@model Usuario
+@{
+    Layout = "_LayoutPublico";
+    ViewData["Title"] = "Confirme seu e-mail · Plateia";
+}
+<div class="pagina-conta">
+    <div class="secao-conta" style="max-width:460px;margin:0 auto">
+        <h1 class="display" style="font-size:40px">Confirme seu e-mail</h1>
+        <p class="suave">Enviamos um código de 6 dígitos para <b>@Model.Email</b>. Assim garantimos que só você vê os seus ingressos.</p>
+        @if (ViewBag.Erro is string erro) { <div class="alerta-caixa erro" role="alert">@erro</div> }
+        <form method="post" asp-antiforgery="true" action="/confirmar-email" style="display:grid;gap:14px">
+            <label class="campo">Código<input name="codigo" required inputmode="numeric" autocomplete="one-time-code" maxlength="7" pattern="[0-9 ]{6,7}" class="campo-codigo" autofocus></label>
+            <input type="hidden" name="returnUrl" value="@ViewBag.Volta">
+            <button class="btn pri grande">Confirmar</button>
+        </form>
+        <form method="post" asp-antiforgery="true" action="/confirmar-email/enviar" style="text-align:center">
+            <button class="btn fantasma">Não chegou? Enviar outro código</button>
+        </form>
+        <p class="suave" style="font-size:13px;text-align:center">Confira também a caixa de spam. O código vale por @((int)CodigoService.Validade.TotalMinutes) minutos.</p>
+    </div>
+</div>

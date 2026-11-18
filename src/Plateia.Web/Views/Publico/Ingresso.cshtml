@@ -8,6 +8,10 @@
     var novo = Context.Request.Query["novo"] == "1";
     var link = (string)ViewBag.Link;
     var tinta = Texto.TintaSobre(e.Cor);
+    // Comprado junto com outros ingressos: o pagamento é um só, do pedido inteiro.
+    var pedido = ViewBag.Pedido as Pedido;
+    var emGrupo = pedido is not null && pedido.Inscricoes.Count > 1;
+    var valorCobrado = emGrupo ? pedido!.APagar : Model.Valor;
 }
 <div class="pagina-ingresso">
     <a class="voltar" href="/e/@e.Slug" style="margin:0">← @e.Titulo</a>
@@ -22,7 +26,7 @@
 
     <article class="bilhete ingresso @(novo ? "imprimindo" : "") @(Model.Ativa ? "" : "cancelado")" aria-label="Ingresso de @Model.Nome para @e.Titulo">
         <div class="cartaz" style="--cor:@e.Cor;--tinta:@tinta">
-            <div class="linha"><span>Nº @Texto.Numero(e.Id)</span><span>@(Model.TipoIngresso?.Nome)</span></div>
+            <div class="linha"><span>Nº @Texto.Numero(e.Id)</span><span>@(Model.TipoIngresso?.Nome)@(Model.Meia ? " · MEIA" : "")</span></div>
             <h1 class="display">@e.Titulo</h1>
             <div class="linha"><span>@Hora.Data(e.InicioEm)</span><span>@e.Local</span></div>
         </div>
@@ -44,7 +48,8 @@
                 <div><dt>Quando</dt><dd>@Hora.DataLonga(e.InicioEm)</dd></div>
                 <div><dt>Onde</dt><dd>@(e.Formato == FormatoEvento.Online ? "Online" : e.Local)@(e.Presencial && e.Endereco is { } end ? $" · {end}" : "")@(e.Presencial && e.CidadeUf.Length > 0 ? $" · {e.CidadeUf}" : "")</dd></div>
                 @if (Model.TipoIngresso?.Espaco is { } esp) { <div><dt>Espaço</dt><dd>@esp.Nome</dd></div> }
-                <div><dt>Ingresso</dt><dd>@Model.TipoIngresso?.Nome</dd></div>
+                <div><dt>Ingresso</dt><dd>@Model.TipoIngresso?.Nome@(Model.Meia ? " · Meia-entrada" : "")</dd></div>
+                @if (Model.Meia) { <div><dt>Atenção</dt><dd>Apresente o documento que dá direito à meia-entrada.</dd></div> }
             </dl>
             @if (e.Presencial) { <a class="link-mapa" href="@Texto.LinkMapa(e)" target="_blank" rel="noopener" style="justify-self:center">Como chegar ↗</a> }
         </div>
@@ -55,12 +60,26 @@
         var podePagar = ViewBag.Online == true && e.Status == StatusEvento.Publicado && (e.FimEm ?? e.InicioEm) > DateTime.UtcNow;
         if (podePagar)
         {
-            <form class="pagar-online" method="post" asp-antiforgery="true" action="/ingresso/@Model.Codigo/pagar">
-                <b>Falta pagar @Hora.Dinheiro(Model.Valor)</b>
-                <span style="font-size:14px;opacity:.85">Seu lugar está reservado. Conclua o pagamento para garantir o ingresso.</span>
-                <button class="btn">Pagar com a Cielo · cartão ou Pix</button>
-                <small>Você vai para a página segura da Cielo. Depois de pagar, volte a este link: o ingresso atualiza sozinho.</small>
-            </form>
+            @if (pedido is not null)
+            {
+                @* Ingresso comprado pelo checkout: o pagamento (Pix na página ou cartão na Cielo) é feito na página do pedido. *@
+                <div class="pagar-online">
+                    <b>Falta pagar @Hora.Dinheiro(pedido.APagar)</b>
+                    <span style="font-size:14px;opacity:.85">@(emGrupo
+                        ? $"Este ingresso faz parte do pedido {pedido.Codigo}, com {pedido.Inscricoes.Count(x => x.Ativa)} ingressos. O pagamento é um só, para todos."
+                        : "Seu lugar está reservado. Conclua o pagamento para garantir o ingresso.")</span>
+                    <a class="btn" href="/pedido/@pedido.Codigo#pagamento">Pagar com Pix ou cartão</a>
+                </div>
+            }
+            else
+            {
+                <form class="pagar-online" method="post" asp-antiforgery="true" action="/ingresso/@Model.Codigo/pagar">
+                    <b>Falta pagar @Hora.Dinheiro(Model.Valor)</b>
+                    <span style="font-size:14px;opacity:.85">Seu lugar está reservado. Conclua o pagamento para garantir o ingresso.</span>
+                    <button class="btn">Pagar com a Cielo · cartão ou Pix</button>
+                    <small>Você vai para a página segura da Cielo. Depois de pagar, volte a este link: o ingresso atualiza sozinho.</small>
+                </form>
+            }
             @if (e.InstrucoesPagamento is { } outras)
             {
                 <div class="pagar"><b>Outras formas de pagar</b><span>@outras</span></div>
@@ -69,9 +88,9 @@
         else
         {
             <div class="pagar">
-                <b>Falta pagar @Hora.Dinheiro(Model.Valor)</b>
+                <b>Falta pagar @Hora.Dinheiro(valorCobrado)</b>
                 <span>@(e.InstrucoesPagamento ?? "A organização vai entrar em contato com as instruções de pagamento.")</span>
-                <span style="opacity:.75">Informe o código <b class="mono">@Model.Codigo</b> ao enviar o comprovante.</span>
+                <span style="opacity:.75">Informe o código <b class="mono">@(emGrupo ? pedido!.Codigo : Model.Codigo)</b> ao enviar o comprovante.</span>
             </div>
         }
     }
@@ -84,6 +103,10 @@
         </div>
     }
     @if (TempData["erro"] is string erroPg) { <div class="alerta-caixa erro" role="alert">@erroPg</div> }
+    @if (emGrupo)
+    {
+        <div class="aviso-pedido"><span>Faz parte do pedido <b class="mono">@pedido!.Codigo</b> · @pedido.Inscricoes.Count ingressos</span><a class="btn" href="/pedido/@pedido.Codigo">Ver pedido</a></div>
+    }
 
     @if (Model.Ativa)
     {
