@@ -1,0 +1,153 @@
+@model PaginaCheckout
+@{
+    Layout = "_LayoutPublico";
+    var p = Model.Pedido;
+    var e = p.Evento!;
+    ViewData["Title"] = $"Pagamento · {e.Titulo}";
+    ViewData["Cor"] = e.Cor;
+    ViewData["ErroNaPagina"] = true;
+    var aPagar = p.APagar;
+    var ativos = p.Inscricoes.Where(i => i.Ativa).OrderBy(i => i.Id).ToList();
+    var formaPix = Context.Request.Query["forma"] == "pix" || (!Model.CartaoNaPagina && !Model.CartaoNaCielo && Model.Pix);
+    var pixPronto = Model.Pix && p.PixCopiaCola is not null && p.PixValor == aPagar;
+    var cartaoAtivo = Model.CartaoNaPagina && Model.TokenCartao is not null;
+}
+<div class="pagina-checkout">
+    <a class="voltar" href="/e/@e.Slug" style="margin:0">← @e.Titulo</a>
+    <div class="checkout-titulo">
+        <h1 class="display">Pagamento</h1>
+        <p class="suave">Pedido <b class="mono">@p.Codigo</b> · seus lugares estão reservados. Conclua o pagamento para garantir os ingressos.</p>
+    </div>
+
+    @if (TempData["erro"] is string erro) { <div class="alerta-caixa erro" role="alert">@erro</div> }
+
+    <div class="checkout-grade">
+        <section class="checkout-pagar" aria-label="Forma de pagamento">
+            <div class="abas-pagamento duas" role="tablist">
+                <input type="radio" name="forma" id="forma-cartao" checked="@(formaPix ? null : "checked")">
+                <label for="forma-cartao" role="tab">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg>Cartão de crédito
+                </label>
+                <input type="radio" name="forma" id="forma-pix" checked="@(formaPix ? "checked" : null)">
+                <label for="forma-pix" role="tab">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 4 4-4 4-4-4zM3 12l4-4 4 4-4 4zM13 12l4-4 4 4-4 4zM12 13l4 4-4 4-4-4z"/></svg>Pix
+                </label>
+
+                @* ---------- Cartão de crédito ---------- *@
+                <div class="painel-forma painel-cartao">
+                    @if (!Model.CartaoNaPagina && Model.CartaoNaCielo)
+                    {
+                        <form method="post" asp-antiforgery="true" action="/pedido/@p.Codigo/pagar" style="display:grid;gap:10px">
+                            <button class="btn pri grande">Pagar @Hora.Dinheiro(aPagar) com cartão de crédito</button>
+                            <small class="suave" style="text-align:center">Você vai para a página segura da Cielo para digitar o cartão.</small>
+                        </form>
+                    }
+                    else
+                    {
+                        @if (!Model.CartaoNaPagina)
+                        {
+                            <div class="alerta-caixa">Pagamento com cartão ainda não configurado neste site (faltam as credenciais da Cielo). O formulário abaixo é só uma prévia.</div>
+                        }
+                        else if (Model.TokenCartao is null)
+                        {
+                            <div class="alerta-caixa erro">A Cielo não respondeu agora. Atualize a página em instantes ou pague com Pix.</div>
+                        }
+                        <div class="cartao-previa" data-previa aria-hidden="true">
+                            <div class="cp-topo"><span class="cp-chip"></span><b data-previa-bandeira></b></div>
+                            <div class="cp-numero" data-previa-numero>•••• •••• •••• ••••</div>
+                            <div class="cp-base"><span data-previa-nome>NOME COMO NO CARTÃO</span><span data-previa-validade>MM/AA</span></div>
+                        </div>
+
+                        <form id="form-cartao" class="form-cartao" method="post" asp-antiforgery="true" action="/pedido/@p.Codigo/cartao" autocomplete="on"
+                              data-token="@Model.TokenCartao" data-ambiente="@(Model.Sandbox ? "sandbox" : "production")" data-script="@(cartaoAtivo ? Model.ScriptCartao : null)">
+                            @* Os campos do cartão não têm "name": não são enviados ao Plateia. O script da Cielo os envia direto para a Cielo. *@
+                            <input type="hidden" class="bp-sop-cardtype" value="creditCard">
+                            <input type="hidden" class="bp-sop-cardexpirationdate" data-validade-completa>
+                            <input type="hidden" name="paymentToken" data-token-cartao>
+                            <input type="hidden" name="bandeira" data-bandeira>
+
+                            <label class="campo">Número do cartão
+                                <span class="campo-icone"><input class="bp-sop-cardnumber" data-numero inputmode="numeric" autocomplete="cc-number" placeholder="0000 0000 0000 0000" maxlength="23" required><b data-bandeira-txt></b></span>
+                            </label>
+                            <label class="campo">Nome impresso no cartão
+                                <input class="bp-sop-cardholdername" data-nome autocomplete="cc-name" maxlength="25" required placeholder="Como está escrito no cartão" style="text-transform:uppercase">
+                            </label>
+                            <div class="linha2">
+                                <label class="campo">Validade<input data-validade inputmode="numeric" autocomplete="cc-exp" placeholder="MM/AA" maxlength="5" required></label>
+                                <label class="campo">Código de segurança (CVV)<input class="bp-sop-cardcvvc" data-cvv inputmode="numeric" autocomplete="cc-csc" placeholder="000" maxlength="4" required></label>
+                            </div>
+                            <label class="campo">Parcelas
+                                <select name="parcelas">
+                                    @for (var n = 1; n <= Model.MaxParcelas; n++)
+                                    {
+                                        <option value="@n">@(n == 1 ? $"À vista · {Hora.Dinheiro(aPagar)}" : $"{n}x de {(Math.Floor(aPagar / n * 100) / 100).ToString("C2", Hora.PtBr)} sem juros")</option>
+                                    }
+                                </select>
+                            </label>
+                            <p class="erro-cartao" data-erro-cartao role="alert" hidden></p>
+                            <button class="btn pri grande" data-pagar-cartao disabled="@(cartaoAtivo ? null : "disabled")">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Pagar @Hora.Dinheiro(aPagar)
+                            </button>
+                            <p class="selo-seguro"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Os dados do cartão vão direto para a Cielo, com criptografia. O Plateia não vê nem guarda o número do seu cartão.</p>
+                        </form>
+                    }
+                </div>
+
+                @* ---------- Pix ---------- *@
+                <div class="painel-forma painel-pix" data-situacao="@(pixPronto ? $"/pedido/{p.Codigo}/situacao" : null)" data-pago-url="/pedido/@p.Codigo?novo=1">
+                    @if (!Model.Pix)
+                    {
+                        <div class="alerta-caixa">Pix ainda não configurado neste site (faltam as credenciais da Cielo).</div>
+                    }
+                    else if (pixPronto)
+                    {
+                        <div class="qr-pix" role="img" aria-label="QR Code do Pix">@Html.Raw(Qr.Svg(p.PixCopiaCola!))</div>
+                        <ol class="passos-pix">
+                            <li>Abra o app do seu banco e escolha <b>Pix › Ler QR Code</b></li>
+                            <li>Ou copie o código abaixo e use <b>Pix copia e cola</b></li>
+                            <li>Confirme o pagamento de <b>@Hora.Dinheiro(aPagar)</b></li>
+                        </ol>
+                        <div class="copia-cola">
+                            <input id="pix-copia" value="@p.PixCopiaCola" readonly aria-label="Pix copia e cola" onfocus="this.select()">
+                            <button type="button" class="btn pri" data-copiar-de="#pix-copia">Copiar código</button>
+                        </div>
+                        <p class="aguardando" aria-live="polite"><span class="pulso"></span>Aguardando o pagamento. Esta página muda sozinha quando o Pix cair.</p>
+                    }
+                    else
+                    {
+                        <form method="post" asp-antiforgery="true" action="/pedido/@p.Codigo/pix" class="form-pix">
+                            <p class="suave" style="margin:0">Aprovação na hora: os ingressos ficam pagos assim que o Pix cair.</p>
+                            <label class="campo">CPF de quem vai pagar <small>exigido pelo Pix; não fica guardado</small>
+                                <input name="cpf" inputmode="numeric" autocomplete="off" required maxlength="14" placeholder="000.000.000-00"></label>
+                            <button class="btn pri grande">Gerar Pix de @Hora.Dinheiro(aPagar)</button>
+                        </form>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <aside class="checkout-resumo" style="--cor:@e.Cor;--tinta:@Texto.TintaSobre(e.Cor)">
+            <div class="cartaz resumo-topo">
+                <span>@Hora.Data(e.InicioEm)</span>
+                <b class="display">@e.Titulo</b>
+                <span>@(e.Formato == FormatoEvento.Online ? "Online" : e.Local)</span>
+            </div>
+            <ul class="resumo-itens">
+                @foreach (var i in ativos)
+                {
+                    <li><span><b>@i.Nome</b><small>@i.TipoIngresso?.Nome@(i.Meia ? " · meia" : "")</small></span><span class="mono">@Texto.Preco(i.Valor)</span></li>
+                }
+            </ul>
+            @if (p.Desconto > 0) { <div class="resumo-linha"><span>Desconto (cupom)</span><span class="mono">− @Hora.Dinheiro(p.Desconto)</span></div> }
+            @if (ativos.Any(i => i.Pagamento != StatusPagamento.Pendente)) { <div class="resumo-linha"><span>Já pago</span><span class="mono">− @Hora.Dinheiro(ativos.Where(i => i.Pagamento != StatusPagamento.Pendente).Sum(i => i.Valor))</span></div> }
+            <div class="resumo-linha total"><span>Total a pagar</span><span class="mono">@Hora.Dinheiro(aPagar)</span></div>
+            <small class="suave">Comprado por @p.Nome · @p.Email</small>
+        </aside>
+    </div>
+
+    @if (e.InstrucoesPagamento is { } outras)
+    {
+        <div class="pagar"><b>Outras formas de pagar</b><span>@outras</span><span style="opacity:.75">Informe o código do pedido <b class="mono">@p.Codigo</b> ao enviar o comprovante.</span></div>
+    }
+    <a class="voltar" href="/pedido/@p.Codigo" style="justify-self:center">Ver o pedido e os ingressos</a>
+</div>

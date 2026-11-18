@@ -68,7 +68,7 @@
                     <span style="font-size:14px;opacity:.85">@(emGrupo
                         ? $"Este ingresso faz parte do pedido {pedido.Codigo}, com {pedido.Inscricoes.Count(x => x.Ativa)} ingressos. O pagamento é um só, para todos."
                         : "Seu lugar está reservado. Conclua o pagamento para garantir o ingresso.")</span>
-                    <a class="btn" href="/pedido/@pedido.Codigo#pagamento">Pagar com Pix ou cartão</a>
+                    <a class="btn" href="/pedido/@pedido.Codigo/checkout">Pagar com cartão ou Pix</a>
                 </div>
             }
             else

@@ -34,50 +34,14 @@
     {
         var aberto = e.Status == StatusEvento.Publicado && (e.FimEm ?? e.InicioEm) > DateTime.UtcNow;
         var temPix = ViewBag.Pix == true && aberto;
+        var temCartaoPagina = ViewBag.CartaoNaPagina == true && aberto;
         var temCartao = ViewBag.Cartao == true && aberto;
         var pixPronto = temPix && Model.PixCopiaCola is not null && Model.PixValor == aPagar;
-        if (temPix || temCartao)
+        if (temPix || temCartao || temCartaoPagina)
         {
-            <section class="pagamento" id="pagamento" data-situacao="@(pixPronto ? $"/pedido/{Model.Codigo}/situacao" : null)">
-                <div class="pagamento-topo"><b>Falta pagar @Hora.Dinheiro(aPagar)</b><span>Um pagamento só para todos os ingressos do pedido.</span></div>
-                <div class="abas-pagamento @(temPix && temCartao ? "duas" : "")" role="tablist">
-                    @if (temPix) { <input type="radio" name="forma" id="forma-pix" checked><label for="forma-pix" role="tab">Pix</label> }
-                    @if (temCartao) { <input type="radio" name="forma" id="forma-cartao" checked="@(temPix ? null : "checked")"><label for="forma-cartao" role="tab">Cartão de crédito</label> }
-
-                    @if (temPix)
-                    {
-                        <div class="painel-forma painel-pix">
-                            @if (pixPronto)
-                            {
-                                <div class="qr-pix" role="img" aria-label="QR Code do Pix">@Html.Raw(Qr.Svg(Model.PixCopiaCola!))</div>
-                                <p class="suave" style="text-align:center;font-size:14px">Abra o app do seu banco, escolha <b>Pix › Ler QR Code</b> ou use o código copia e cola.</p>
-                                <div class="copia-cola">
-                                    <input id="pix-copia" value="@Model.PixCopiaCola" readonly aria-label="Pix copia e cola" onfocus="this.select()">
-                                    <button type="button" class="btn pri" data-copiar-de="#pix-copia">Copiar código</button>
-                                </div>
-                                <p class="aguardando" aria-live="polite"><span class="pulso"></span>Aguardando o pagamento. Esta página atualiza sozinha quando o Pix cair.</p>
-                            }
-                            else
-                            {
-                                <form method="post" asp-antiforgery="true" action="/pedido/@Model.Codigo/pix" class="form-pix">
-                                    <label class="campo">CPF de quem vai pagar <small>exigido pelo Pix da Cielo; não fica guardado</small>
-                                        <input name="cpf" inputmode="numeric" autocomplete="off" required maxlength="14" placeholder="000.000.000-00"></label>
-                                    <button class="btn pri grande">Gerar QR Code Pix</button>
-                                </form>
-                                <p class="suave" style="font-size:13px;text-align:center">Aprovação na hora: os ingressos ficam pagos assim que o Pix cair.</p>
-                            }
-                        </div>
-                    }
-                    @if (temCartao)
-                    {
-                        <div class="painel-forma painel-cartao">
-                            <form method="post" asp-antiforgery="true" action="/pedido/@Model.Codigo/pagar" style="display:grid;gap:10px">
-                                <button class="btn pri grande">Pagar @Hora.Dinheiro(aPagar) com cartão de crédito</button>
-                                <small class="suave" style="text-align:center">Você vai para a página segura da Cielo: os dados do cartão não passam pelo Plateia. Depois de pagar, volte a este link; os ingressos atualizam sozinhos.</small>
-                            </form>
-                        </div>
-                    }
-                </div>
+            <section class="pagamento" id="pagamento">
+                <div class="pagamento-topo"><b>Falta pagar @Hora.Dinheiro(aPagar)</b><span>Os lugares estão reservados. Pague com cartão de crédito ou Pix.</span></div>
+                <a class="btn pri grande" href="/pedido/@Model.Codigo/checkout">Ir para o pagamento</a>
             </section>
             @if (e.InstrucoesPagamento is { } outras) { <div class="pagar"><b>Outras formas de pagar</b><span>@outras</span></div> }
         }

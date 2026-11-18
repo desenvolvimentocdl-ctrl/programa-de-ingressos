@@ -363,6 +363,98 @@
         i.value = d.replace(/^(\d{3})(\d)/, "$1.$2").replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1-$2");
     }));
 
+    // ---------- Checkout: cartão de crédito (Silent Order Post da Cielo) ----------
+    // O número, a validade e o CVV não têm "name": nunca são enviados ao Plateia.
+    // O script da Cielo lê esses campos, manda direto para a Cielo e devolve um PaymentToken; só o token vem para o servidor.
+    const formCartao = $("#form-cartao");
+    if (formCartao) {
+        const num = $("[data-numero]", formCartao), nome = $("[data-nome]", formCartao), val = $("[data-validade]", formCartao), cvv = $("[data-cvv]", formCartao);
+        const erroCartao = $("[data-erro-cartao]", formCartao), botao = $("[data-pagar-cartao]", formCartao);
+        const previa = $("[data-previa]");
+        // Bandeiras aceitas pela Cielo (Elo e Hipercard antes de Visa/Master, porque alguns BINs se sobrepõem).
+        const bandeiras = [
+            ["Elo", /^(401178|401179|431274|438935|451416|457393|457631|457632|504175|506699|5067[0-7]\d|509\d{3}|627780|636297|636368|650\d{3}|6516[5-7]\d|6550[0-5]\d)/],
+            ["Hipercard", /^(606282|3841)/],
+            ["Amex", /^3[47]/],
+            ["Diners", /^3(0[0-5]|[68])/],
+            ["Discover", /^(6011|65|64[4-9])/],
+            ["JCB", /^35(2[89]|[3-8])/],
+            ["Visa", /^4/],
+            ["Master", /^(5[1-5]|2(2[2-9]|[3-6]\d|7[01]|720))/]
+        ];
+        const bandeiraDe = d => (bandeiras.find(([, re]) => re.test(d)) || [""])[0];
+        const luhn = d => { let s = 0; for (let i = 0; i < d.length; i++) { let n = +d[d.length - 1 - i]; if (i % 2) { n *= 2; if (n > 9) n -= 9; } s += n; } return d.length >= 13 && s % 10 === 0; };
+        const mostrarErro = t => { erroCartao.textContent = t; erroCartao.hidden = !t; };
+
+        num.addEventListener("input", () => {
+            const d = num.value.replace(/\D/g, "").slice(0, 19);
+            const b = bandeiraDe(d);
+            num.value = b === "Amex" ? d.replace(/^(\d{4})(\d{0,6})(\d{0,5}).*/, (_, a, c, e) => [a, c, e].filter(Boolean).join(" ")) : d.replace(/(\d{4})(?=\d)/g, "$1 ");
+            $("[data-bandeira-txt]", formCartao).textContent = b;
+            cvv.maxLength = b === "Amex" ? 4 : 3;
+            if (previa) {
+                $("[data-previa-numero]", previa).textContent = (num.value || "•••• •••• •••• ••••");
+                $("[data-previa-bandeira]", previa).textContent = b;
+                previa.dataset.bandeira = b.toLowerCase();
+            }
+        });
+        nome.addEventListener("input", () => { if (previa) $("[data-previa-nome]", previa).textContent = nome.value.toUpperCase() || "NOME COMO NO CARTÃO"; });
+        val.addEventListener("input", () => {
+            const d = val.value.replace(/\D/g, "").slice(0, 4);
+            val.value = d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
+            if (previa) $("[data-previa-validade]", previa).textContent = val.value || "MM/AA";
+        });
+        cvv.addEventListener("input", () => cvv.value = cvv.value.replace(/\D/g, "").slice(0, cvv.maxLength));
+
+        // Carrega o script da Cielo só nesta página (e só quando o pagamento com cartão está configurado).
+        if (formCartao.dataset.script) {
+            const s = document.createElement("script");
+            s.src = formCartao.dataset.script;
+            s.async = true;
+            s.onerror = () => mostrarErro("Não foi possível carregar o pagamento da Cielo. Atualize a página ou pague com Pix.");
+            document.head.append(s);
+        }
+
+        formCartao.addEventListener("submit", ev => {
+            if ($("[data-token-cartao]", formCartao).value) return; // já tem o token: envia ao Plateia
+            ev.preventDefault();
+            mostrarErro("");
+            const d = num.value.replace(/\D/g, ""), b = bandeiraDe(d);
+            const [mm, aa] = val.value.split("/");
+            const agora = new Date(), ano = 2000 + +(aa || 0), mes = +(mm || 0);
+            if (!b || !luhn(d)) return mostrarErro("Número do cartão inválido. Confira os dígitos.");
+            if (!(mes >= 1 && mes <= 12) || ano < agora.getFullYear() || (ano === agora.getFullYear() && mes < agora.getMonth() + 1))
+                return mostrarErro("Validade inválida ou vencida. Use o formato MM/AA.");
+            if (cvv.value.length < (b === "Amex" ? 4 : 3)) return mostrarErro("Confira o código de segurança (CVV) no verso do cartão.");
+            if (nome.value.trim().length < 3) return mostrarErro("Informe o nome como está impresso no cartão.");
+            if (typeof window.bpSop_silentOrderPost !== "function") return mostrarErro("O pagamento da Cielo ainda está carregando. Tente de novo em instantes.");
+
+            $("[data-validade-completa]", formCartao).value = `${String(mes).padStart(2, "0")}/${ano}`;
+            $("[data-bandeira]", formCartao).value = b;
+            nome.value = nome.value.toUpperCase();
+            botao.disabled = true;
+            botao.dataset.texto ??= botao.innerHTML;
+            botao.textContent = "Processando pagamento…";
+            const voltar = msg => { botao.disabled = false; botao.innerHTML = botao.dataset.texto; mostrarErro(msg); };
+            window.bpSop_silentOrderPost({
+                accessToken: formCartao.dataset.token,
+                environment: formCartao.dataset.ambiente,
+                language: "PT",
+                enableTokenize: false,
+                cvvRequired: true,
+                onSuccess: r => {
+                    if (!r || !r.PaymentToken) return voltar("A Cielo não confirmou os dados do cartão. Tente de novo.");
+                    $("[data-token-cartao]", formCartao).value = r.PaymentToken;
+                    botao.textContent = "Confirmando com o banco…";
+                    formCartao.submit();
+                },
+                onError: () => voltar("Não foi possível validar o cartão na Cielo. Confira os dados e tente de novo."),
+                onInvalid: () => voltar("Algum dado do cartão está inválido. Confira número, validade e CVV."),
+                onBinNotFound: () => voltar("Não reconhecemos este cartão. Confira o número ou use outro cartão.")
+            });
+        });
+    }
+
     // ---------- Página pública: cupom de desconto ----------
     const formIns = $("#form-inscricao");
     if (formIns && $("[data-aplicar-cupom]", formIns)) {

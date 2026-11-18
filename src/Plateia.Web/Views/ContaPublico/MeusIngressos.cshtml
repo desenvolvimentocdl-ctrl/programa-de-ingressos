@@ -56,7 +56,7 @@
                     </ul>
                     @foreach (var p in pedidosPendentes)
                     {
-                        <a class="btn pri" href="/pedido/@p.Codigo#pagamento">Pagar pedido @p.Codigo · Pix ou cartão</a>
+                        <a class="btn pri" href="/pedido/@p.Codigo/checkout">Pagar pedido @p.Codigo · cartão ou Pix</a>
                     }
                 </article>
             }

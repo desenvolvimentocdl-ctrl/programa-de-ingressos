@@ -9,7 +9,7 @@ namespace Plateia.Application;
 /// Ingressos comprados num pedido (checkout) são pagos juntos, com um único link pelo total do pedido;
 /// inscrições avulsas (antigas ou manuais) continuam com um link próprio.
 /// </summary>
-public class PagamentoService(IAppDbContext db, IPagamentoOnline gateway, IPagamentoPix pix)
+public class PagamentoService(IAppDbContext db, IPagamentoOnline gateway, IPagamentoPix pix, IPagamentoCartao cartao)
 {
     /// <summary>Algum pagamento online disponível (cartão pela Cielo ou Pix na página).</summary>
     public bool Online => gateway.Configurado || pix.Configurado;
@@ -17,6 +17,38 @@ public class PagamentoService(IAppDbContext db, IPagamentoOnline gateway, IPagam
     public bool Cartao => gateway.Configurado;
     /// <summary>Pix com QR Code na própria página do pedido.</summary>
     public bool Pix => pix.Configurado;
+    /// <summary>Cartão digitado na página de checkout do Plateia (Silent Order Post da Cielo).</summary>
+    public bool CartaoNaPagina => cartao.Configurado;
+    public int MaxParcelas => cartao.MaxParcelas;
+    public bool Sandbox => cartao.Sandbox;
+    public string ScriptCartao => cartao.ScriptSop;
+    public Task<string?> TokenCartaoAsync() => cartao.TokenAcessoAsync();
+
+    static readonly string[] Bandeiras = ["Visa", "Master", "Elo", "Amex", "Hipercard", "Diners", "Discover", "JCB", "Aura"];
+
+    /// <summary>
+    /// Cobra o que falta do pedido no cartão de crédito. Chega só o token que a Cielo devolveu ao navegador:
+    /// número, validade e código de segurança do cartão nunca passam pelo Plateia.
+    /// </summary>
+    public async Task PagarComCartaoAsync(Pedido p, string? paymentToken, string? bandeira, int parcelas)
+    {
+        if (!cartao.Configurado) throw new RegraNegocioException("O pagamento com cartão ainda não está disponível.");
+        var valor = p.APagar;
+        if (valor <= 0) throw new RegraNegocioException("Este pedido já está pago.");
+        var ev = p.Evento ?? await db.Eventos.FirstAsync(e => e.Id == p.EventoId);
+        ValidarEvento(ev);
+        if (string.IsNullOrWhiteSpace(paymentToken) || paymentToken.Length > 100)
+            throw new RegraNegocioException("Não recebemos os dados do cartão. Preencha de novo e tente outra vez.");
+        var marca = Bandeiras.FirstOrDefault(b => string.Equals(b, bandeira, StringComparison.OrdinalIgnoreCase))
+                    ?? throw new RegraNegocioException("Não reconhecemos a bandeira do cartão. Confira o número.");
+        parcelas = Math.Clamp(parcelas, 1, cartao.MaxParcelas);
+
+        var r = await cartao.PagarAsync($"{p.Codigo}-C{DateTime.UtcNow:HHmmss}", valor, parcelas, p.Nome, paymentToken, marca);
+        if (!r.Aprovado) throw new RegraNegocioException(r.Mensagem);
+        var forma = parcelas > 1 ? $"Cielo · crédito {parcelas}x" : "Cielo · crédito";
+        await AplicarAsync(p, new PagamentoOnline(SituacaoOnline.Pago, r.PaymentId, valor, forma));
+        await db.SaveChangesAsync();
+    }
 
     /// <summary>
     /// Gera (ou reaproveita) o Pix do pedido pelo valor que falta. O mesmo Pix vale enquanto o valor não mudar

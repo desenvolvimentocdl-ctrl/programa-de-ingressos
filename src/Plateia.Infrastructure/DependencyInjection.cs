@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.Configure<Email.EmailOptions>(config.GetSection("Email"));
         services.AddSingleton<IEnvioEmail, Email.SmtpEnvioEmail>();
         services.AddHttpClient<IPagamentoPix, CieloPix>(c => c.Timeout = TimeSpan.FromSeconds(30));
+        services.AddHttpClient<IPagamentoCartao, CieloCartao>(c => c.Timeout = TimeSpan.FromSeconds(40));
 
         services.AddScoped<CodigoService>();
         services.AddScoped<EventoService>();

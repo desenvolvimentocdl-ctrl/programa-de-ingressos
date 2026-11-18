@@ -124,6 +124,8 @@ public class PublicoController(AppDbContext db, InscricaoService inscricoes, Pag
                 ? new ParticipanteCheckout(x.TipoId, nome, email, telefone, x.Meia)
                 : new ParticipanteCheckout(x.TipoId, x.Nome, x.Email, x.Telefone, x.Meia)).ToList();
             var pedido = await inscricoes.CheckoutAsync(pagina.Evento.Id, nome, email, telefone, itens, cupom, canal);
+            // Tem valor a pagar: vai direto para a página de checkout (cartão ou Pix).
+            if (pedido.APagar > 0) return Redirect($"/pedido/{pedido.Codigo}/checkout");
             return pedido.Inscricoes.Count == 1
                 ? Redirect($"/ingresso/{pedido.Inscricoes[0].Codigo}?novo=1")
                 : Redirect($"/pedido/{pedido.Codigo}?novo=1");
@@ -150,6 +152,7 @@ public class PublicoController(AppDbContext db, InscricaoService inscricoes, Pag
         }
         ViewBag.Pix = pagamentos.Pix;
         ViewBag.Cartao = pagamentos.Cartao;
+        ViewBag.CartaoNaPagina = pagamentos.CartaoNaPagina;
         return View(p);
     }
 
@@ -167,6 +170,46 @@ public class PublicoController(AppDbContext db, InscricaoService inscricoes, Pag
         }
     }
 
+    /// <summary>
+    /// Página de checkout: o cliente digita o cartão de crédito (enviado direto do navegador para a Cielo)
+    /// ou gera o Pix com QR Code, sem sair do Plateia.
+    /// </summary>
+    [HttpGet("/pedido/{codigo}/checkout")]
+    public async Task<IActionResult> Checkout(string codigo)
+    {
+        var p = await CarregarPedido(codigo);
+        if (p is null) return NotFound();
+        if (p.APagar > 0 && (p.PixPaymentId ?? p.CieloLinkId) is not null)
+        {
+            try { await pagamentos.SincronizarAsync(p); }
+            catch (Exception ex) { log.LogWarning(ex, "Falha ao consultar a Cielo para o pedido {Codigo}", p.Codigo); }
+        }
+        if (p.APagar <= 0) return Redirect($"/pedido/{p.Codigo}?novo=1");
+        var pg = new PaginaCheckout
+        {
+            Pedido = p, Pix = pagamentos.Pix, CartaoNaPagina = pagamentos.CartaoNaPagina, CartaoNaCielo = pagamentos.Cartao,
+            MaxParcelas = pagamentos.MaxParcelas, Sandbox = pagamentos.Sandbox, ScriptCartao = pagamentos.ScriptCartao
+        };
+        if (pg.CartaoNaPagina) pg.TokenCartao = await pagamentos.TokenCartaoAsync();
+        return View(pg);
+    }
+
+    /// <summary>Cobra no cartão com o token que a Cielo devolveu ao navegador (os dados do cartão não chegam aqui).</summary>
+    [HttpPost("/pedido/{codigo}/cartao"), EnableRateLimiting("publico")]
+    public async Task<IActionResult> PagarCartao(string codigo, string? paymentToken, string? bandeira, int parcelas = 1)
+    {
+        var p = await CarregarPedido(codigo);
+        if (p is null) return NotFound();
+        try { await pagamentos.PagarComCartaoAsync(p, paymentToken, bandeira, parcelas); }
+        catch (HttpRequestException ex)
+        {
+            log.LogError(ex, "Cielo indisponível ao cobrar o cartão do pedido {Codigo}", p.Codigo);
+            throw new RegraNegocioException("A Cielo não respondeu agora. Nada foi cobrado: tente de novo em instantes.");
+        }
+        TempData["msg"] = "Pagamento aprovado! Seus ingressos estão confirmados.";
+        return Redirect($"/pedido/{p.Codigo}?novo=1");
+    }
+
     /// <summary>Gera o Pix do pedido (QR Code + copia e cola) na própria página.</summary>
     [HttpPost("/pedido/{codigo}/pix"), EnableRateLimiting("publico")]
     public async Task<IActionResult> GerarPix(string codigo, string? cpf)
@@ -179,7 +222,7 @@ public class PublicoController(AppDbContext db, InscricaoService inscricoes, Pag
             log.LogError(ex, "Cielo indisponível ao gerar Pix do pedido {Codigo}", p.Codigo);
             throw new RegraNegocioException("A Cielo não respondeu agora. Tente de novo em instantes.");
         }
-        return Redirect($"/pedido/{p.Codigo}#pagamento");
+        return Redirect($"/pedido/{p.Codigo}/checkout?forma=pix");
     }
 
     /// <summary>A página do pedido pergunta a cada poucos segundos se o Pix já caiu (a consulta à Cielo é limitada a uma a cada 5 s).</summary>

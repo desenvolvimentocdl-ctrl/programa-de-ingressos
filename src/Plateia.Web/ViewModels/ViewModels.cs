@@ -45,6 +45,21 @@ public class ParticipanteForm
     public bool Meia { get; set; }
 }
 
+public class PaginaCheckout
+{
+    public required Pedido Pedido { get; init; }
+    public bool Pix { get; init; }
+    /// <summary>Cartão digitado nesta página (Silent Order Post da Cielo).</summary>
+    public bool CartaoNaPagina { get; init; }
+    /// <summary>Alternativa: cartão na página da Cielo (Link de Pagamento), quando o Silent Order Post não está configurado.</summary>
+    public bool CartaoNaCielo { get; init; }
+    public int MaxParcelas { get; init; } = 1;
+    public bool Sandbox { get; init; }
+    public string ScriptCartao { get; init; } = "";
+    /// <summary>Token de acesso do Silent Order Post (vazio = Cielo não respondeu).</summary>
+    public string? TokenCartao { get; set; }
+}
+
 public class PaginaMeusIngressos
 {
     public required Usuario Usuario { get; init; }
