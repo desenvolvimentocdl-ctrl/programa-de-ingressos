@@ -97,7 +97,19 @@
                 <div class="painel-forma painel-pix" data-situacao="@(pixPronto ? $"/pedido/{p.Codigo}/situacao" : null)" data-pago-url="/pedido/@p.Codigo?novo=1">
                     @if (!Model.Pix)
                     {
-                        <div class="alerta-caixa">Pix ainda não configurado neste site (faltam as credenciais da Cielo).</div>
+                        var pixDemo = PixSimulado.CopiaCola(aPagar, p.Codigo);
+                        <div class="alerta-caixa">Simulação: este QR Code é só de demonstração e não cobra nada. O Pix de verdade entra quando as credenciais da Cielo forem configuradas.</div>
+                        <div class="qr-pix qr-simulado" role="img" aria-label="QR Code do Pix (simulação)">@Html.Raw(Qr.Svg(pixDemo))<span class="selo-simulado">SIMULAÇÃO</span></div>
+                        <ol class="passos-pix">
+                            <li>Abra o app do seu banco e escolha <b>Pix › Ler QR Code</b></li>
+                            <li>Ou copie o código abaixo e use <b>Pix copia e cola</b></li>
+                            <li>Confirme o pagamento de <b>@Hora.Dinheiro(aPagar)</b></li>
+                        </ol>
+                        <div class="copia-cola">
+                            <input id="pix-copia" value="@pixDemo" readonly aria-label="Pix copia e cola (simulação)" onfocus="this.select()">
+                            <button type="button" class="btn pri" data-copiar-de="#pix-copia">Copiar código</button>
+                        </div>
+                        <p class="aguardando"><span class="pulso"></span>Aguardando o pagamento (simulação).</p>
                     }
                     else if (pixPronto)
                     {

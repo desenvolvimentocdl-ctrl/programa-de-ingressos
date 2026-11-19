@@ -987,6 +987,8 @@ body.publico .topo-publico:has(.drop.gaveta[open]) { backdrop-filter: none; back
 #forma-pix:checked ~ .painel-pix, #forma-cartao:checked ~ .painel-cartao { display: grid; }
 .qr-pix { width: min(240px, 70vw); justify-self: center; padding: 14px; background: #fff; border-radius: 14px; border: 1px solid var(--linha); }
 .qr-pix svg { display: block; width: 100%; height: auto; }
+.qr-simulado { position: relative; }
+.selo-simulado { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-12deg); padding: 6px 12px; border-radius: 8px; background: #fff; border: 2px solid #B0242F; color: #B0242F; font: 800 14px var(--mono); letter-spacing: .12em; white-space: nowrap; }
 .copia-cola { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .copia-cola input { font: 12px var(--mono) !important; }
 body.publico .copia-cola .btn.pri { width: auto; }

@@ -206,6 +206,39 @@ public static class Qr
     }
 }
 
+/// <summary>
+/// Pix de demonstração: monta um "copia e cola" no formato do BR Code (com CRC válido), mas com chave fictícia.
+/// Usado na página de checkout enquanto a Cielo não está configurada. Nenhum pagamento é feito.
+/// </summary>
+public static class PixSimulado
+{
+    public static string CopiaCola(decimal valor, string codigoPedido)
+    {
+        static string C(string id, string v) => id + v.Length.ToString("00") + v;
+        var txid = new string(codigoPedido.Where(char.IsLetterOrDigit).Take(25).ToArray());
+        if (txid.Length == 0) txid = "***";
+        var corpo = C("00", "01")
+            + C("26", C("00", "br.gov.bcb.pix") + C("01", "simulacao@plateia.exemplo"))
+            + C("52", "0000") + C("53", "986")
+            + C("54", valor.ToString("0.00", CultureInfo.InvariantCulture))
+            + C("58", "BR") + C("59", "PLATEIA SIMULACAO") + C("60", "SAO PAULO")
+            + C("62", C("05", txid))
+            + "6304";
+        return corpo + Crc16(corpo).ToString("X4");
+    }
+
+    private static ushort Crc16(string s)
+    {
+        ushort crc = 0xFFFF;
+        foreach (var b in System.Text.Encoding.UTF8.GetBytes(s))
+        {
+            crc ^= (ushort)(b << 8);
+            for (var i = 0; i < 8; i++) crc = (crc & 0x8000) != 0 ? (ushort)((crc << 1) ^ 0x1021) : (ushort)(crc << 1);
+        }
+        return crc;
+    }
+}
+
 public static class Inicializacao
 {
     public static async Task ExecutarAsync(IServiceProvider sp, IConfiguration config, ILogger log)
